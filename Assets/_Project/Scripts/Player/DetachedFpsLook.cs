@@ -20,7 +20,17 @@ public class DetachedFpsLook : MonoBehaviour
 
     [Header("Camera Follow")]
     [SerializeField] private Vector3 cameraOffset = new Vector3(0f, 1.6f, 0f);
+    [SerializeField] private bool smoothCameraFollow = false;
     [SerializeField, Min(0f)] private float followLerpSpeed = 30f;
+
+    [Header("Speed FOV")]
+    [SerializeField] private bool enableSpeedFov = true;
+    [SerializeField] private Rigidbody speedSourceBody;
+    [SerializeField, Min(1f)] private float baseFieldOfView = 71f;
+    [SerializeField, Min(1f)] private float maxFieldOfView = 95f;
+    [SerializeField, Min(0.1f)] private float speedForMaxFov = 40f;
+    [SerializeField, Min(0f)] private float fovLerpSpeed = 7f;
+    [SerializeField] private bool ignoreVerticalSpeedForFov = true;
 
     [Header("Cursor")]
     [SerializeField] private bool lockCursor = true;
@@ -28,6 +38,7 @@ public class DetachedFpsLook : MonoBehaviour
 
     private float yaw;
     private float pitch;
+    private Camera playerCameraComponent;
 
     private void Reset()
     {
@@ -37,6 +48,7 @@ public class DetachedFpsLook : MonoBehaviour
         if (Camera.main != null)
         {
             playerCamera = Camera.main.transform;
+            baseFieldOfView = Camera.main.fieldOfView;
         }
     }
 
@@ -57,6 +69,30 @@ public class DetachedFpsLook : MonoBehaviour
             playerCamera = Camera.main.transform;
         }
 
+        if (speedSourceBody == null && playerYawRoot != null)
+        {
+            speedSourceBody = playerYawRoot.GetComponent<Rigidbody>();
+        }
+
+        if (speedSourceBody == null)
+        {
+            speedSourceBody = GetComponent<Rigidbody>();
+        }
+
+        playerCameraComponent = playerCamera != null ? playerCamera.GetComponent<Camera>() : null;
+        if (playerCameraComponent != null)
+        {
+            if (baseFieldOfView <= 0f)
+            {
+                baseFieldOfView = playerCameraComponent.fieldOfView;
+            }
+
+            if (maxFieldOfView < baseFieldOfView)
+            {
+                maxFieldOfView = baseFieldOfView;
+            }
+        }
+
         yaw = playerYawRoot.rotation.eulerAngles.y;
 
         if (playerCamera != null)
@@ -69,6 +105,11 @@ public class DetachedFpsLook : MonoBehaviour
     private void OnEnable()
     {
         ApplyCursorState();
+
+        if (playerCameraComponent != null)
+        {
+            playerCameraComponent.fieldOfView = baseFieldOfView;
+        }
     }
 
     private void OnDisable()
@@ -108,14 +149,17 @@ public class DetachedFpsLook : MonoBehaviour
 
         Vector3 targetPosition = cameraFollowTarget.TransformPoint(cameraOffset);
 
-        if (followLerpSpeed <= 0f)
+        if (!smoothCameraFollow || followLerpSpeed <= 0f)
         {
             playerCamera.position = targetPosition;
+            UpdateDynamicFov();
             return;
         }
 
         float blend = 1f - Mathf.Exp(-followLerpSpeed * Time.deltaTime);
         playerCamera.position = Vector3.Lerp(playerCamera.position, targetPosition, blend);
+
+        UpdateDynamicFov();
     }
 
     private Vector2 ReadLookInputDegrees()
@@ -153,6 +197,47 @@ public class DetachedFpsLook : MonoBehaviour
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = !hideCursor;
+    }
+
+    private void UpdateDynamicFov()
+    {
+        if (!enableSpeedFov || playerCameraComponent == null)
+        {
+            return;
+        }
+
+        float speed = 0f;
+        if (speedSourceBody != null)
+        {
+            Vector3 velocity = BodyVelocity(speedSourceBody);
+            if (ignoreVerticalSpeedForFov)
+            {
+                velocity.y = 0f;
+            }
+
+            speed = velocity.magnitude;
+        }
+
+        float speedT = speedForMaxFov <= 0f ? 1f : Mathf.Clamp01(speed / speedForMaxFov);
+        float targetFov = Mathf.Lerp(baseFieldOfView, maxFieldOfView, speedT);
+
+        if (fovLerpSpeed <= 0f)
+        {
+            playerCameraComponent.fieldOfView = targetFov;
+            return;
+        }
+
+        float blend = 1f - Mathf.Exp(-fovLerpSpeed * Time.deltaTime);
+        playerCameraComponent.fieldOfView = Mathf.Lerp(playerCameraComponent.fieldOfView, targetFov, blend);
+    }
+
+    private static Vector3 BodyVelocity(Rigidbody body)
+    {
+#if UNITY_6000_0_OR_NEWER
+        return body.linearVelocity;
+#else
+        return body.velocity;
+#endif
     }
 
     private static float NormalizeAngle(float angleDegrees)

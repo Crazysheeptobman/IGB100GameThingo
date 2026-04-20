@@ -269,6 +269,7 @@ GameObject:
   - component: {fileID: 90014699}
   - component: {fileID: 90014698}
   - component: {fileID: 90014702}
+  - component: {fileID: 90014703}
   m_Layer: 0
   m_Name: GrappleGun
   m_TagString: Untagged
@@ -389,17 +390,62 @@ MonoBehaviour:
   captureStartingOffset: 1
   cameraLocalOffset: {x: 0.3, y: -0.25, z: 0.6}
   modelRotationOffsetEuler: {x: 0, y: 0, z: 0}
+  smoothPosition: 1
+  smoothRotation: 1
+  positionSmoothingInCameraSpace: 1
   positionLerpSpeed: 24
   rotationLerpSpeed: 20
+  applyFastTurnLag: 0
   fastTurnLagThreshold: 10.2
   fastTurnLagStrength: 0.45
   alignToLookPoint: 1
   gunForwardAxisLocal: {x: 0, y: 0, z: 1}
   aimAlignmentStrength: 1
+  minAimForwardDot: 0.05
   maxAimDistance: 250
   aimMask:
     serializedVersion: 2
     m_Bits: 4294967295
+--- !u!114 &90014703
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 90014697}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f361951b34354bdbb0d3eea7c3865359, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GrappleGunController
+  playerBody: {fileID: 916302470}
+  playerCamera: {fileID: 57914080}
+  gunPivot: {fileID: 90014701}
+  muzzleTip: {fileID: 1360971824}
+  ropeRenderer: {fileID: 0}
+  grappleMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  maxGrappleDistance: 65
+  minimumAttachDistance: 1.5
+  initialRopeTightness: 0.9
+  useCameraAssistAim: 1
+  swingSpring: 5.5
+  swingDamper: 2.5
+  swingMassScale: 4
+  enableReelIn: 1
+  reelInSpeed: 16
+  pullAcceleration: 28
+  maxPullSpeed: 24
+  minimumRopeLength: 1.75
+  autoDetachDistance: 1.35
+  directPullAcceleration: 90
+  directPullMaxSpeed: 48
+  directPullSteerStrength: 30
+  holdToMaintainGrapple: 1
+  autoCreateRopeRenderer: 1
+  ropeWidth: 0.025
+  ropeColor: {r: 0.9, g: 0.95, b: 1, a: 1}
 --- !u!1 &272724801
 GameObject:
   m_ObjectHideFlags: 0
@@ -508,7 +554,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1.24}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -544,6 +590,63 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1202801308}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &569495335
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 6188282186356670611, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
+      propertyPath: m_Name
+      value: Segment
+      objectReference: {fileID: 0}
+    - target: {fileID: 8824176885985573224, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8824176885985573224, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8824176885985573224, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8824176885985573224, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8824176885985573224, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8824176885985573224, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8824176885985573224, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8824176885985573224, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8824176885985573224, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8824176885985573224, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
 --- !u!1 &780409472
 GameObject:
   m_ObjectHideFlags: 0
@@ -715,6 +818,8 @@ GameObject:
   - component: {fileID: 916302466}
   - component: {fileID: 916302465}
   - component: {fileID: 916302464}
+  - component: {fileID: 916302470}
+  - component: {fileID: 916302469}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -743,7 +848,15 @@ MonoBehaviour:
   minPitch: -80
   maxPitch: 85
   cameraOffset: {x: 0, y: 0.7, z: 0}
+  smoothCameraFollow: 0
   followLerpSpeed: 30
+  enableSpeedFov: 1
+  speedSourceBody: {fileID: 0}
+  baseFieldOfView: 71
+  maxFieldOfView: 95
+  speedForMaxFov: 40
+  fovLerpSpeed: 7
+  ignoreVerticalSpeedForFov: 1
   lockCursor: 1
   hideCursor: 1
 --- !u!136 &916302465
@@ -843,6 +956,92 @@ Transform:
   - {fileID: 90014701}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &916302469
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 916302463}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: accd15dfd68dd454ea7c00dc572dfd31, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ParkourPlayerMovement
+  moveReference: {fileID: 916302468}
+  walkSpeed: 12
+  sprintSpeed: 15
+  groundAcceleration: 75
+  groundDeceleration: 60
+  airAcceleration: 28
+  maxAirSpeed: 11
+  normalizeMoveInput: 1
+  grappleController: {fileID: 0}
+  grappleAirControlAcceleration: 45
+  grappleAirControlMaxSpeed: 60
+  preserveGrappleMomentum: 1
+  enableDash: 1
+  dashSpeed: 22
+  dashDuration: 0.14
+  dashCooldown: 0.45
+  jumpVelocity: 8.5
+  coyoteTime: 0.12
+  jumpBufferTime: 0.15
+  gravity: 30
+  lowJumpGravityMultiplier: 1.8
+  fallGravityMultiplier: 2.1
+  maxFallSpeed: 38
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  groundCheckDistance: 0.08
+  maxGroundAngle: 52
+  enableWallMovement: 1
+  wallMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  wallCheckDistance: 0.65
+  wallProbeHeightOffset: 0.6
+  maxWallUpDot: 0.2
+  wallClimbSpeed: 5
+  wallClimbAcceleration: 16
+  wallStickForce: 14
+  wallSlideMaxSpeed: 3.5
+  wallJumpUpVelocity: 8
+  wallJumpAwayVelocity: 7
+  wallJumpForwardBonus: 1.75
+  wallClimbInputThreshold: 0.05
+  configureRigidbodyOnAwake: 1
+  interpolation: 1
+  collisionDetection: 2
+  drawDebugGizmos: 0
+--- !u!54 &916302470
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 916302463}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
 --- !u!1 &1187395105
 GameObject:
   m_ObjectHideFlags: 0
@@ -1144,6 +1343,79 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1202801308}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2120303539
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2120303541}
+  - component: {fileID: 2120303540}
+  m_Layer: 0
+  m_Name: Generator
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &2120303540
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2120303539}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0003509211decc45a0b7943eda93bb9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SegmentGen
+  segments:
+  - prefab: {fileID: 6188282186356670611, guid: 8d2b9fa34bee84fab92ee67bbc3e27bc, type: 3}
+    weight: 1
+  - prefab: {fileID: 6188282186356670611, guid: ad73bdd7cb5864dfe8520900fda38629, type: 3}
+    weight: 1
+  legacySegmentPrefabs:
+  - {fileID: 6188282186356670611, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
+  legacySegmentSelectionWeights: []
+  player: {fileID: 916302468}
+  segmentParent: {fileID: 2120303541}
+  useGeneratorForward: 1
+  tileSize: 50
+  firstSegmentDistance: 50
+  spawnHeight: 0
+  spawnAheadDistance: 220
+  despawnBehindDistance: 120
+  initialSegments: 5
+  startNearPlayer: 1
+  startBehindPlayerDistance: 60
+  avoidImmediateRepeats: 1
+  maxSequentialRepeats: 1
+  useDeterministicSeed: 0
+  deterministicSeed: 12345
+  usePooling: 1
+  poolPrewarmPerPrefab: 1
+  maxSpawnsPerFrame: 8
+  maxDespawnsPerFrame: 12
+  runInFixedUpdate: 0
+  drawDebug: 0
+--- !u!4 &2120303541
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2120303539}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &153718676934717333
 GameObject:
@@ -3397,3 +3669,5 @@ SceneRoots:
   - {fileID: 780409475}
   - {fileID: 272724805}
   - {fileID: 916302468}
+  - {fileID: 2120303541}
+  - {fileID: 569495335}

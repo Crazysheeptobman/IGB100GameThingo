@@ -820,6 +820,7 @@ GameObject:
   - component: {fileID: 916302464}
   - component: {fileID: 916302470}
   - component: {fileID: 916302469}
+  - component: {fileID: 916302471}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1042,6 +1043,22 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
+--- !u!114 &916302471
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 916302463}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 38d1ed6d68cc3a046af2cc557517426d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HighScoreSystem
+  player: {fileID: 916302468}
+  showScoreOnGui: 1
+  guiPosition: {x: 10, y: 10}
+  guiSize: {x: 210, y: 40}
 --- !u!1 &1187395105
 GameObject:
   m_ObjectHideFlags: 0

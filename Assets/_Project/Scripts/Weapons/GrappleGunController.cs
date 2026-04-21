@@ -11,6 +11,7 @@ public class GrappleGunController : MonoBehaviour
     [SerializeField] private Transform playerCamera;
     [SerializeField] private Transform gunPivot;
     [SerializeField] private Transform muzzleTip;
+    [SerializeField] private Transform hookVisual;
     [SerializeField] private LineRenderer ropeRenderer;
 
     [Header("Grapple Cast")]
@@ -46,11 +47,31 @@ public class GrappleGunController : MonoBehaviour
     [SerializeField, Min(0f)] private float ropeWidth = 0.025f;
     [SerializeField] private Color ropeColor = new Color(0.9f, 0.95f, 1f, 1f);
 
+    [Header("Hook Visual")]
+    [SerializeField, Min(0f)] private float hookLaunchSpeed = 85f;
+    [SerializeField, Min(0f)] private float hookRetractSpeed = 110f;
+    [SerializeField, Min(0f)] private float hookSnapDistance = 0.04f;
+    [SerializeField] private bool rotateHookToVelocity = true;
+    [SerializeField] private bool orientHookToSurfaceOnLatch = true;
+    [SerializeField] private Vector3 hookForwardAxisLocal = Vector3.forward;
+
     private SpringJoint grappleJoint;
+    private Rigidbody grappleConnectedBody;
+    private Vector3 grappleConnectedLocalPoint;
+    private Vector3 grappleConnectedLocalNormal;
     private Vector3 grapplePoint;
+    private Vector3 grappleSurfaceNormal = Vector3.forward;
     private float targetRopeLength;
     private bool isGrappling;
+    private bool hasPendingGrapple;
+    private bool isPrimaryController = true;
     private GrappleMode activeGrappleMode = GrappleMode.None;
+    private GrappleMode pendingGrappleMode = GrappleMode.None;
+
+    private HookVisualState hookVisualState = HookVisualState.Idle;
+    private Vector3 hookHomeLocalPosition;
+    private Quaternion hookHomeLocalRotation;
+    private bool hasHookHomePose;
 
     public bool IsGrappling => isGrappling;
     public bool IsDirectPulling => isGrappling && activeGrappleMode == GrappleMode.DirectPull;
@@ -60,6 +81,14 @@ public class GrappleGunController : MonoBehaviour
         None = 0,
         SwingPull = 1,
         DirectPull = 2
+    }
+
+    private enum HookVisualState
+    {
+        Idle = 0,
+        Firing = 1,
+        Latched = 2,
+        Retracting = 3
     }
 
     private void Reset()
@@ -74,10 +103,20 @@ public class GrappleGunController : MonoBehaviour
         if (muzzleTip == null)
         {
             Transform foundTip = transform.Find("GunTip");
+            if (foundTip == null)
+            {
+                foundTip = transform.Find("Tip");
+            }
+
             if (foundTip != null)
             {
                 muzzleTip = foundTip;
             }
+        }
+
+        if (hookVisual == null)
+        {
+            hookVisual = FindLikelyHookVisual(transform);
         }
     }
 
@@ -101,6 +140,11 @@ public class GrappleGunController : MonoBehaviour
         if (muzzleTip == null)
         {
             Transform foundTip = gunPivot != null ? gunPivot.Find("GunTip") : null;
+            if (foundTip == null && gunPivot != null)
+            {
+                foundTip = gunPivot.Find("Tip");
+            }
+
             if (foundTip != null)
             {
                 muzzleTip = foundTip;
@@ -111,17 +155,49 @@ public class GrappleGunController : MonoBehaviour
             }
         }
 
+        if (hookVisual == null)
+        {
+            hookVisual = FindLikelyHookVisual(gunPivot);
+            if (hookVisual == null && muzzleTip != null)
+            {
+                hookVisual = FindLikelyHookVisual(muzzleTip.parent);
+            }
+
+            if (hookVisual == null)
+            {
+                hookVisual = FindLikelyHookVisual(transform);
+            }
+        }
+
+        CacheHookHomePose();
+        ResetHookVisualImmediate();
+
         EnsureRopeRenderer();
         SetRopeVisible(false);
+        isPrimaryController = IsPrimaryControllerForPlayerBody();
     }
 
     private void OnDisable()
     {
-        StopGrapple();
+        EndGrapple(playRetract: false, immediateVisualReset: true);
     }
 
     private void Update()
     {
+        bool shouldHandleInput = IsPrimaryControllerForPlayerBody();
+        if (!shouldHandleInput)
+        {
+            if (isPrimaryController)
+            {
+                EndGrapple(playRetract: false, immediateVisualReset: true);
+            }
+
+            isPrimaryController = false;
+            return;
+        }
+
+        isPrimaryController = true;
+
         ReadGrappleInput(
             out bool leftPressed,
             out bool leftHeld,
@@ -129,6 +205,38 @@ public class GrappleGunController : MonoBehaviour
             out bool rightPressed,
             out bool rightHeld,
             out _);
+
+        if (hasPendingGrapple)
+        {
+            if (rightPressed && pendingGrappleMode != GrappleMode.SwingPull)
+            {
+                TryStartGrapple(GrappleMode.SwingPull);
+                return;
+            }
+
+            if (leftPressed && pendingGrappleMode != GrappleMode.DirectPull)
+            {
+                TryStartGrapple(GrappleMode.DirectPull);
+                return;
+            }
+
+            bool pendingPressed = pendingGrappleMode == GrappleMode.SwingPull ? rightPressed : leftPressed;
+            bool pendingHeld = pendingGrappleMode == GrappleMode.SwingPull ? rightHeld : leftHeld;
+
+            if (holdToMaintainGrapple)
+            {
+                if (!pendingHeld)
+                {
+                    EndGrapple(playRetract: true, immediateVisualReset: false);
+                }
+            }
+            else if (pendingPressed)
+            {
+                EndGrapple(playRetract: true, immediateVisualReset: false);
+            }
+
+            return;
+        }
 
         if (!isGrappling)
         {
@@ -163,18 +271,25 @@ public class GrappleGunController : MonoBehaviour
         {
             if (!activeHeld)
             {
-                StopGrapple();
+                EndGrapple(playRetract: true, immediateVisualReset: false);
             }
         }
         else if (activePressed)
         {
-            StopGrapple();
+            EndGrapple(playRetract: true, immediateVisualReset: false);
         }
     }
 
     private void FixedUpdate()
     {
-        if (!isGrappling || playerBody == null)
+        if (!isPrimaryController || playerBody == null)
+        {
+            return;
+        }
+
+        RefreshDynamicAnchor();
+
+        if (!isGrappling)
         {
             return;
         }
@@ -184,7 +299,7 @@ public class GrappleGunController : MonoBehaviour
 
         if (distanceToAnchor <= autoDetachDistance)
         {
-            StopGrapple();
+            EndGrapple(playRetract: true, immediateVisualReset: false);
             return;
         }
 
@@ -202,14 +317,14 @@ public class GrappleGunController : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (!isGrappling || ropeRenderer == null || muzzleTip == null)
+        if (!isPrimaryController || muzzleTip == null)
         {
             return;
         }
 
-        ropeRenderer.positionCount = 2;
-        ropeRenderer.SetPosition(0, muzzleTip.position);
-        ropeRenderer.SetPosition(1, grapplePoint);
+        RefreshDynamicAnchor();
+        UpdateHookVisual(Time.deltaTime);
+        UpdateRopeVisual();
     }
 
     private void TryStartGrapple(GrappleMode grappleMode)
@@ -219,63 +334,47 @@ public class GrappleGunController : MonoBehaviour
             return;
         }
 
-        Vector3 castOrigin = muzzleTip.position;
-        Vector3 castDirection = GetCastDirectionFromTip(castOrigin);
-        if (castDirection.sqrMagnitude < 0.0001f)
+        if (!TryGetGrappleHitPoint(out RaycastHit hit))
         {
             return;
         }
 
-        if (!Physics.Raycast(castOrigin, castDirection, out RaycastHit hit, maxGrappleDistance, grappleMask, QueryTriggerInteraction.Ignore))
+        if (Vector3.Distance(playerBody.worldCenterOfMass, hit.point) < minimumAttachDistance)
         {
             return;
         }
 
-        float distance = Vector3.Distance(playerBody.worldCenterOfMass, hit.point);
-        if (distance < minimumAttachDistance)
-        {
-            return;
-        }
+        EndGrapple(playRetract: false, immediateVisualReset: false);
+        CaptureAnchor(hit);
 
-        StopGrapple();
-
-        if (grappleMode == GrappleMode.SwingPull)
-        {
-            grappleJoint = playerBody.gameObject.AddComponent<SpringJoint>();
-            grappleJoint.autoConfigureConnectedAnchor = false;
-            grappleJoint.connectedAnchor = hit.point;
-            grappleJoint.enableCollision = false;
-            grappleJoint.spring = swingSpring;
-            grappleJoint.damper = swingDamper;
-            grappleJoint.massScale = swingMassScale;
-
-            targetRopeLength = Mathf.Clamp(distance * initialRopeTightness, minimumRopeLength, distance);
-            grappleJoint.maxDistance = targetRopeLength;
-            grappleJoint.minDistance = 0f;
-        }
-
-        grapplePoint = hit.point;
-        activeGrappleMode = grappleMode;
-        isGrappling = true;
-        SetRopeVisible(true);
-    }
-
-    private void StopGrapple()
-    {
-        isGrappling = false;
+        hasPendingGrapple = true;
+        pendingGrappleMode = grappleMode;
         activeGrappleMode = GrappleMode.None;
+        isGrappling = false;
+        SetRopeVisible(true);
 
-        if (grappleJoint != null)
+        if (hookVisual != null)
         {
-            Destroy(grappleJoint);
-            grappleJoint = null;
+            hookVisualState = HookVisualState.Firing;
+            hookVisual.position = muzzleTip.position;
+            Vector3 launchDirection = grapplePoint - hookVisual.position;
+            if (rotateHookToVelocity && launchDirection.sqrMagnitude > 0.0001f)
+            {
+                SetHookFacing(launchDirection.normalized);
+            }
         }
-
-        SetRopeVisible(false);
+        else
+        {
+            hookVisualState = HookVisualState.Latched;
+            ActivatePendingGrapple();
+        }
     }
 
-    private Vector3 GetCastDirectionFromTip(Vector3 tipPosition)
+    private bool TryGetGrappleHitPoint(out RaycastHit hit)
     {
+        Vector3 castOrigin = muzzleTip != null ? muzzleTip.position : transform.position;
+        Vector3 castDirection = GetFallbackCastDirection();
+
         if (useCameraAssistAim && playerCamera != null)
         {
             Ray lookRay = new Ray(playerCamera.position, playerCamera.forward);
@@ -283,13 +382,75 @@ public class GrappleGunController : MonoBehaviour
                 ? lookHit.point
                 : lookRay.GetPoint(maxGrappleDistance);
 
-            Vector3 towardLookPoint = lookPoint - tipPosition;
-            if (towardLookPoint.sqrMagnitude > 0.0001f)
+            Vector3 assistDirection = lookPoint - castOrigin;
+            if (assistDirection.sqrMagnitude > 0.0001f)
             {
-                return towardLookPoint.normalized;
+                castDirection = assistDirection.normalized;
             }
         }
 
+        if (castDirection.sqrMagnitude < 0.0001f)
+        {
+            hit = default;
+            return false;
+        }
+
+        return Physics.Raycast(castOrigin, castDirection, out hit, maxGrappleDistance, grappleMask, QueryTriggerInteraction.Ignore);
+    }
+
+    private bool IsPrimaryControllerForPlayerBody()
+    {
+        if (playerBody == null)
+        {
+            return true;
+        }
+
+        GrappleGunController[] controllers = playerBody.GetComponentsInChildren<GrappleGunController>(true);
+        GrappleGunController bestController = null;
+        int bestScore = int.MinValue;
+
+        for (int i = 0; i < controllers.Length; i++)
+        {
+            GrappleGunController controller = controllers[i];
+            if (controller == null || !controller.enabled || !controller.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            int score = controller.GetControllerPriorityScore();
+            if (bestController == null || score > bestScore)
+            {
+                bestController = controller;
+                bestScore = score;
+            }
+        }
+
+        return bestController == null || bestController == this;
+    }
+
+    private int GetControllerPriorityScore()
+    {
+        int score = 0;
+        if (useCameraAssistAim)
+        {
+            score += 2;
+        }
+
+        if (gunPivot != null)
+        {
+            score += 1;
+        }
+
+        if (muzzleTip != null && gunPivot != null && muzzleTip != gunPivot)
+        {
+            score += 4;
+        }
+
+        return score;
+    }
+
+    private Vector3 GetFallbackCastDirection()
+    {
         if (muzzleTip != null)
         {
             return muzzleTip.forward;
@@ -301,6 +462,38 @@ public class GrappleGunController : MonoBehaviour
         }
 
         return transform.forward;
+    }
+
+    private static Transform FindLikelyHookVisual(Transform root)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+
+        Transform exact = root.Find("Grapple");
+        if (exact != null)
+        {
+            return exact;
+        }
+
+        exact = root.Find("Hook");
+        if (exact != null)
+        {
+            return exact;
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            string lowerName = child.name.ToLowerInvariant();
+            if (lowerName.Contains("grapple") || lowerName.Contains("hook"))
+            {
+                return child;
+            }
+        }
+
+        return null;
     }
 
     private void ReadGrappleInput(
@@ -350,11 +543,352 @@ public class GrappleGunController : MonoBehaviour
 #endif
     }
 
+    private void CaptureAnchor(RaycastHit hit)
+    {
+        grapplePoint = hit.point;
+
+        if (hit.normal.sqrMagnitude > 0.0001f)
+        {
+            grappleSurfaceNormal = hit.normal.normalized;
+        }
+        else
+        {
+            Vector3 fallbackNormal = -GetFallbackCastDirection();
+            grappleSurfaceNormal = fallbackNormal.sqrMagnitude > 0.0001f ? fallbackNormal.normalized : Vector3.forward;
+        }
+
+        if (hit.rigidbody != null && hit.rigidbody != playerBody)
+        {
+            grappleConnectedBody = hit.rigidbody;
+            grappleConnectedLocalPoint = hit.rigidbody.transform.InverseTransformPoint(hit.point);
+            grappleConnectedLocalNormal = hit.rigidbody.transform.InverseTransformDirection(grappleSurfaceNormal);
+        }
+        else
+        {
+            grappleConnectedBody = null;
+            grappleConnectedLocalPoint = Vector3.zero;
+            grappleConnectedLocalNormal = Vector3.zero;
+        }
+    }
+
+    private void RefreshDynamicAnchor()
+    {
+        if (grappleConnectedBody == null)
+        {
+            return;
+        }
+
+        Transform connectedTransform = grappleConnectedBody.transform;
+        grapplePoint = connectedTransform.TransformPoint(grappleConnectedLocalPoint);
+
+        Vector3 normal = connectedTransform.TransformDirection(grappleConnectedLocalNormal);
+        if (normal.sqrMagnitude > 0.0001f)
+        {
+            grappleSurfaceNormal = normal.normalized;
+        }
+    }
+
+    private void ActivatePendingGrapple()
+    {
+        if (!hasPendingGrapple)
+        {
+            return;
+        }
+
+        if (playerBody == null)
+        {
+            EndGrapple(playRetract: true, immediateVisualReset: false);
+            return;
+        }
+
+        RefreshDynamicAnchor();
+        float distance = Vector3.Distance(playerBody.worldCenterOfMass, grapplePoint);
+        if (distance < minimumAttachDistance)
+        {
+            EndGrapple(playRetract: true, immediateVisualReset: false);
+            return;
+        }
+
+        GrappleMode mode = pendingGrappleMode;
+        hasPendingGrapple = false;
+        pendingGrappleMode = GrappleMode.None;
+
+        activeGrappleMode = mode;
+        isGrappling = true;
+
+        if (mode == GrappleMode.SwingPull)
+        {
+            grappleJoint = playerBody.gameObject.AddComponent<SpringJoint>();
+            grappleJoint.autoConfigureConnectedAnchor = false;
+            grappleJoint.enableCollision = false;
+            grappleJoint.spring = swingSpring;
+            grappleJoint.damper = swingDamper;
+            grappleJoint.massScale = swingMassScale;
+
+            if (grappleConnectedBody != null)
+            {
+                grappleJoint.connectedBody = grappleConnectedBody;
+                grappleJoint.connectedAnchor = grappleConnectedLocalPoint;
+            }
+            else
+            {
+                grappleJoint.connectedBody = null;
+                grappleJoint.connectedAnchor = grapplePoint;
+            }
+
+            targetRopeLength = Mathf.Clamp(distance * initialRopeTightness, minimumRopeLength, distance);
+            grappleJoint.maxDistance = targetRopeLength;
+            grappleJoint.minDistance = 0f;
+        }
+        else
+        {
+            grappleJoint = null;
+        }
+
+        hookVisualState = HookVisualState.Latched;
+        if (orientHookToSurfaceOnLatch)
+        {
+            OrientHookToSurface();
+        }
+
+        SetRopeVisible(true);
+    }
+
+    private void EndGrapple(bool playRetract, bool immediateVisualReset)
+    {
+        bool hadActiveHookState = hasPendingGrapple || isGrappling || hookVisualState == HookVisualState.Firing || hookVisualState == HookVisualState.Latched;
+
+        if (grappleJoint != null)
+        {
+            Destroy(grappleJoint);
+            grappleJoint = null;
+        }
+
+        isGrappling = false;
+        hasPendingGrapple = false;
+        activeGrappleMode = GrappleMode.None;
+        pendingGrappleMode = GrappleMode.None;
+        grappleConnectedBody = null;
+        grappleConnectedLocalPoint = Vector3.zero;
+        grappleConnectedLocalNormal = Vector3.zero;
+
+        if (immediateVisualReset || hookVisual == null)
+        {
+            hookVisualState = HookVisualState.Idle;
+            ResetHookVisualImmediate();
+            SetRopeVisible(false);
+            return;
+        }
+
+        if (playRetract && hadActiveHookState)
+        {
+            hookVisualState = HookVisualState.Retracting;
+            SetRopeVisible(true);
+            return;
+        }
+
+        hookVisualState = HookVisualState.Idle;
+        ResetHookVisualImmediate();
+        SetRopeVisible(false);
+    }
+
+    private void UpdateHookVisual(float deltaTime)
+    {
+        if (hookVisual == null || muzzleTip == null)
+        {
+            return;
+        }
+
+        switch (hookVisualState)
+        {
+            case HookVisualState.Idle:
+            {
+                return;
+            }
+            case HookVisualState.Firing:
+            {
+                MoveHookTowards(grapplePoint, hookLaunchSpeed, deltaTime, out bool reachedTarget);
+                if (reachedTarget)
+                {
+                    hookVisualState = HookVisualState.Latched;
+                    if (orientHookToSurfaceOnLatch)
+                    {
+                        OrientHookToSurface();
+                    }
+
+                    ActivatePendingGrapple();
+                }
+
+                break;
+            }
+            case HookVisualState.Latched:
+            {
+                hookVisual.position = grapplePoint;
+                if (orientHookToSurfaceOnLatch)
+                {
+                    OrientHookToSurface();
+                }
+
+                break;
+            }
+            case HookVisualState.Retracting:
+            {
+                MoveHookTowards(muzzleTip.position, hookRetractSpeed, deltaTime, out bool reachedMuzzle);
+                if (reachedMuzzle)
+                {
+                    hookVisualState = HookVisualState.Idle;
+                    ResetHookVisualImmediate();
+                    SetRopeVisible(false);
+                }
+
+                break;
+            }
+        }
+    }
+
+    private void MoveHookTowards(Vector3 targetPosition, float speed, float deltaTime, out bool reachedTarget)
+    {
+        if (hookVisual == null)
+        {
+            reachedTarget = true;
+            return;
+        }
+
+        if (deltaTime <= 0f || speed <= 0f)
+        {
+            hookVisual.position = targetPosition;
+            reachedTarget = true;
+            return;
+        }
+
+        Vector3 startPosition = hookVisual.position;
+        Vector3 endPosition = Vector3.MoveTowards(startPosition, targetPosition, speed * deltaTime);
+        hookVisual.position = endPosition;
+
+        Vector3 travelDirection = endPosition - startPosition;
+        if (rotateHookToVelocity && travelDirection.sqrMagnitude > 0.000001f)
+        {
+            SetHookFacing(travelDirection.normalized);
+        }
+
+        float snapDistance = Mathf.Max(0.0001f, hookSnapDistance);
+        reachedTarget = (endPosition - targetPosition).sqrMagnitude <= snapDistance * snapDistance;
+        if (reachedTarget)
+        {
+            hookVisual.position = targetPosition;
+        }
+    }
+
+    private void CacheHookHomePose()
+    {
+        if (hookVisual == null)
+        {
+            return;
+        }
+
+        hookHomeLocalPosition = hookVisual.localPosition;
+        hookHomeLocalRotation = hookVisual.localRotation;
+        hasHookHomePose = true;
+    }
+
+    private void ResetHookVisualImmediate()
+    {
+        if (hookVisual == null)
+        {
+            return;
+        }
+
+        if (!hasHookHomePose)
+        {
+            CacheHookHomePose();
+        }
+
+        if (hasHookHomePose)
+        {
+            hookVisual.localPosition = hookHomeLocalPosition;
+            hookVisual.localRotation = hookHomeLocalRotation;
+            return;
+        }
+
+        if (muzzleTip != null)
+        {
+            hookVisual.position = muzzleTip.position;
+            hookVisual.rotation = muzzleTip.rotation;
+        }
+    }
+
+    private void SetHookFacing(Vector3 worldDirection)
+    {
+        if (hookVisual == null || worldDirection.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        Vector3 localForward = hookForwardAxisLocal.sqrMagnitude > 0.0001f ? hookForwardAxisLocal.normalized : Vector3.forward;
+        hookVisual.rotation = Quaternion.FromToRotation(localForward, worldDirection.normalized);
+    }
+
+    private void OrientHookToSurface()
+    {
+        if (hookVisual == null)
+        {
+            return;
+        }
+
+        Vector3 intoSurface = -grappleSurfaceNormal;
+        if (intoSurface.sqrMagnitude < 0.0001f)
+        {
+            intoSurface = GetFallbackCastDirection();
+        }
+
+        if (intoSurface.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        SetHookFacing(intoSurface.normalized);
+    }
+
+    private void UpdateRopeVisual()
+    {
+        if (ropeRenderer == null || muzzleTip == null)
+        {
+            return;
+        }
+
+        bool shouldShowRope = isGrappling || hasPendingGrapple || hookVisualState == HookVisualState.Firing || hookVisualState == HookVisualState.Latched || hookVisualState == HookVisualState.Retracting;
+        if (!shouldShowRope)
+        {
+            SetRopeVisible(false);
+            return;
+        }
+
+        SetRopeVisible(true);
+        ropeRenderer.positionCount = 2;
+        ropeRenderer.SetPosition(0, muzzleTip.position);
+        ropeRenderer.SetPosition(1, GetRopeEndPoint());
+    }
+
+    private Vector3 GetRopeEndPoint()
+    {
+        if (hookVisual != null && hookVisualState != HookVisualState.Idle)
+        {
+            return hookVisual.position;
+        }
+
+        if (isGrappling || hasPendingGrapple)
+        {
+            return grapplePoint;
+        }
+
+        return muzzleTip != null ? muzzleTip.position : transform.position;
+    }
+
     private void ApplySwingPullForces(Vector3 toAnchor, float distanceToAnchor)
     {
         if (grappleJoint == null)
         {
-            StopGrapple();
+            EndGrapple(playRetract: true, immediateVisualReset: false);
             return;
         }
 

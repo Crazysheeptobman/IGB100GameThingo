@@ -25,6 +25,7 @@ public class ParkourPlayerMovement : MonoBehaviour
     [SerializeField, Min(0f)] private float grappleAirControlAcceleration = 45f;
     [SerializeField, Min(0f)] private float grappleAirControlMaxSpeed = 60f;
     [SerializeField] private bool preserveGrappleMomentum = true;
+    [SerializeField] private bool allowAirControlDuringDirectPull = true;
 
     [Header("Dash")]
     [SerializeField] private bool enableDash = true;
@@ -100,7 +101,7 @@ public class ParkourPlayerMovement : MonoBehaviour
     private void Reset()
     {
         moveReference = transform;
-        grappleController = GetComponentInChildren<GrappleGunController>();
+        grappleController = ResolveGrappleController();
     }
 
     private void Awake()
@@ -115,7 +116,7 @@ public class ParkourPlayerMovement : MonoBehaviour
 
         if (grappleController == null)
         {
-            grappleController = GetComponentInChildren<GrappleGunController>();
+            grappleController = ResolveGrappleController();
         }
 
         body.freezeRotation = true;
@@ -436,7 +437,7 @@ public class ParkourPlayerMovement : MonoBehaviour
         bool hasMoveInput = moveDirection.sqrMagnitude > 0.0001f;
         Vector3 currentHorizontalVelocity = GetHorizontalVelocity();
 
-        if (!isGrounded && IsDirectPullingWithGrapple)
+        if (!allowAirControlDuringDirectPull && !isGrounded && IsDirectPullingWithGrapple)
         {
             return;
         }
@@ -709,6 +710,49 @@ public class ParkourPlayerMovement : MonoBehaviour
 #endif
     }
 
-    private bool IsGrappling => grappleController != null && grappleController.IsGrappling;
-    private bool IsDirectPullingWithGrapple => grappleController != null && grappleController.IsDirectPulling;
+    private GrappleGunController ResolveGrappleController()
+    {
+        GrappleGunController[] controllers = GetComponentsInChildren<GrappleGunController>(true);
+        for (int i = 0; i < controllers.Length; i++)
+        {
+            GrappleGunController controller = controllers[i];
+            if (controller != null && controller.enabled && controller.gameObject.activeInHierarchy)
+            {
+                return controller;
+            }
+        }
+
+        return controllers.Length > 0 ? controllers[0] : null;
+    }
+
+    private bool IsAnyControllerGrappling(bool directPullOnly)
+    {
+        if (grappleController != null)
+        {
+            if (directPullOnly ? grappleController.IsDirectPulling : grappleController.IsGrappling)
+            {
+                return true;
+            }
+        }
+
+        GrappleGunController[] controllers = GetComponentsInChildren<GrappleGunController>(true);
+        for (int i = 0; i < controllers.Length; i++)
+        {
+            GrappleGunController controller = controllers[i];
+            if (controller == null || controller == grappleController)
+            {
+                continue;
+            }
+
+            if (directPullOnly ? controller.IsDirectPulling : controller.IsGrappling)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsGrappling => IsAnyControllerGrappling(false);
+    private bool IsDirectPullingWithGrapple => IsAnyControllerGrappling(true);
 }

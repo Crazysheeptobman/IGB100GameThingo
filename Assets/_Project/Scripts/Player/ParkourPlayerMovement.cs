@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -22,7 +23,7 @@ public class ParkourPlayerMovement : MonoBehaviour
 
     [Header("Grapple Momentum")]
     [SerializeField] private GrappleGunController grappleController;
-    [SerializeField, Min(0f)] private float grappleAirControlAcceleration = 45f;
+    [SerializeField, Min(0f)] private float grappleAirControlAcceleration = 16f;
     [SerializeField, Min(0f)] private float grappleAirControlMaxSpeed = 60f;
     [SerializeField] private bool preserveGrappleMomentum = true;
     [SerializeField] private bool allowAirControlDuringDirectPull = true;
@@ -69,6 +70,9 @@ public class ParkourPlayerMovement : MonoBehaviour
     [SerializeField] private RigidbodyInterpolation interpolation = RigidbodyInterpolation.Interpolate;
     [SerializeField] private CollisionDetectionMode collisionDetection = CollisionDetectionMode.ContinuousDynamic;
 
+    [Header("Death")]
+    [SerializeField] private float deathYLevel = -50f;
+
     [Header("Debug")]
     [SerializeField] private bool drawDebugGizmos;
 
@@ -97,6 +101,7 @@ public class ParkourPlayerMovement : MonoBehaviour
 
     private float timeSinceLastGrounded;
     private float jumpBufferCounter;
+    private bool isRestartingScene;
 
     private void Reset()
     {
@@ -141,7 +146,18 @@ public class ParkourPlayerMovement : MonoBehaviour
 
     private void Update()
     {
+        if (isRestartingScene)
+        {
+            return;
+        }
+
         ReadInput();
+
+        if (ShouldRestartScene())
+        {
+            RestartScene();
+            return;
+        }
 
         if (jumpBufferCounter > 0f)
         {
@@ -287,6 +303,41 @@ public class ParkourPlayerMovement : MonoBehaviour
         {
             dashQueued = true;
         }
+    }
+
+    private bool ShouldRestartScene()
+    {
+        return transform.position.y < deathYLevel || WasRestartPressedThisFrame();
+    }
+
+    private bool WasRestartPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame)
+        {
+            return true;
+        }
+#endif
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+        return Input.GetKeyDown(KeyCode.R);
+#else
+        return false;
+#endif
+    }
+
+    private void RestartScene()
+    {
+        isRestartingScene = true;
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (activeScene.buildIndex >= 0)
+        {
+            SceneManager.LoadScene(activeScene.buildIndex);
+            return;
+        }
+
+        SceneManager.LoadScene(activeScene.name);
     }
 
     private void RefreshGroundState()
@@ -476,34 +527,82 @@ public class ParkourPlayerMovement : MonoBehaviour
 
     private void ApplyGrappleAirControl(Vector3 moveDirection, bool hasMoveInput, Vector3 currentHorizontalVelocity)
     {
-        if (!hasMoveInput && preserveGrappleMomentum)
+        if (!hasMoveInput)
         {
             return;
         }
 
-        float targetSpeed = sprintHeld ? sprintSpeed : walkSpeed;
-        Vector3 targetVelocity = moveDirection * targetSpeed;
-        Vector3 velocityDelta = targetVelocity - currentHorizontalVelocity;
-        float controlAcceleration = grappleAirControlAcceleration > 0f ? grappleAirControlAcceleration : airAcceleration;
-        Vector3 clampedDelta = Vector3.ClampMagnitude(velocityDelta, controlAcceleration * Time.fixedDeltaTime);
-        Vector3 projectedVelocity = currentHorizontalVelocity + clampedDelta;
-        float speedCap = Mathf.Max(maxAirSpeed, grappleAirControlMaxSpeed);
-
-        if (speedCap > 0f && projectedVelocity.magnitude > speedCap)
+        Vector3 controlDirection = moveDirection;
+        if (TryGetActiveGrapplePoint(out Vector3 grapplePoint))
         {
-            float currentSpeed = currentHorizontalVelocity.magnitude;
-            bool steeringSameGeneralDirection = Vector3.Dot(projectedVelocity, currentHorizontalVelocity) > 0f;
-            if (preserveGrappleMomentum && currentSpeed > speedCap && steeringSameGeneralDirection)
+            Vector3 toAnchor = grapplePoint - body.worldCenterOfMass;
+            if (toAnchor.sqrMagnitude > 0.0001f)
             {
-                projectedVelocity = projectedVelocity.normalized * currentSpeed;
-            }
-            else
-            {
-                projectedVelocity = projectedVelocity.normalized * speedCap;
+                controlDirection = Vector3.ProjectOnPlane(controlDirection, toAnchor.normalized);
             }
         }
 
-        body.AddForce(projectedVelocity - currentHorizontalVelocity, ForceMode.VelocityChange);
+        if (controlDirection.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        controlDirection.Normalize();
+
+        if (preserveGrappleMomentum)
+        {
+            Vector3 currentVelocity = BodyVelocity;
+            if (currentVelocity.sqrMagnitude > 0.0001f)
+            {
+                Vector3 velocityDirection = currentVelocity.normalized;
+                Vector3 alongVelocity = Vector3.Project(controlDirection, velocityDirection);
+                if (Vector3.Dot(alongVelocity, velocityDirection) < 0f)
+                {
+                    controlDirection -= alongVelocity;
+                    if (controlDirection.sqrMagnitude < 0.0001f)
+                    {
+                        return;
+                    }
+
+                    controlDirection.Normalize();
+                }
+            }
+        }
+
+        float controlAcceleration = grappleAirControlAcceleration > 0f ? grappleAirControlAcceleration : airAcceleration;
+        float speedCap = Mathf.Max(maxAirSpeed, grappleAirControlMaxSpeed);
+        float speedAlongControl = Vector3.Dot(BodyVelocity, controlDirection);
+        float availableSpeed = speedCap > 0f ? speedCap - Mathf.Max(0f, speedAlongControl) : float.PositiveInfinity;
+
+        if (availableSpeed <= 0f)
+        {
+            return;
+        }
+
+        float controlSpeed = controlAcceleration * Time.fixedDeltaTime;
+        if (!float.IsPositiveInfinity(availableSpeed))
+        {
+            controlSpeed = Mathf.Min(controlSpeed, availableSpeed);
+        }
+
+        if (controlSpeed <= 0f)
+        {
+            return;
+        }
+
+        Vector3 velocityDelta = controlDirection * controlSpeed;
+        if (preserveGrappleMomentum && currentHorizontalVelocity.sqrMagnitude > 0.0001f)
+        {
+            Vector3 horizontalDelta = velocityDelta;
+            horizontalDelta.y = 0f;
+
+            if (Vector3.Dot(currentHorizontalVelocity, horizontalDelta) < 0f)
+            {
+                velocityDelta -= Vector3.Project(horizontalDelta, currentHorizontalVelocity.normalized);
+            }
+        }
+
+        body.AddForce(velocityDelta, ForceMode.VelocityChange);
     }
 
     private void TryStartDash()
@@ -750,6 +849,32 @@ public class ParkourPlayerMovement : MonoBehaviour
             }
         }
 
+        return false;
+    }
+
+    private bool TryGetActiveGrapplePoint(out Vector3 point)
+    {
+        if (grappleController != null && grappleController.TryGetActiveGrapplePoint(out point))
+        {
+            return true;
+        }
+
+        GrappleGunController[] controllers = GetComponentsInChildren<GrappleGunController>(true);
+        for (int i = 0; i < controllers.Length; i++)
+        {
+            GrappleGunController controller = controllers[i];
+            if (controller == null || controller == grappleController)
+            {
+                continue;
+            }
+
+            if (controller.TryGetActiveGrapplePoint(out point))
+            {
+                return true;
+            }
+        }
+
+        point = default;
         return false;
     }
 

@@ -73,6 +73,20 @@ public class ParkourPlayerMovement : MonoBehaviour
     [Header("Death")]
     [SerializeField] private float deathYLevel = -50f;
 
+    [Header("Wind Audio")]
+    [SerializeField] private AudioClip windClip;
+    [SerializeField] private AudioSource windSource;
+    [SerializeField, Range(0f, 1f)] private float windBaseVolume = 0.04f;
+    [SerializeField, Range(0f, 1f)] private float windMaxVolume = 0.42f;
+    [SerializeField, Min(0f)] private float windMinSpeed = 8f;
+    [SerializeField, Min(0.01f)] private float windMaxSpeed = 40f;
+    [SerializeField, Range(0f, 1f)] private float groundedWindMultiplier = 0.35f;
+    [SerializeField, Range(0f, 1f)] private float airborneWindBoost = 0.15f;
+    [SerializeField, Range(0f, 1f)] private float grappleWindBoost = 0.12f;
+    [SerializeField, Range(0f, 1f)] private float forwardSwingWindBoost = 0.45f;
+    [SerializeField, Range(0.1f, 2f)] private float windResponseCurve = 0.65f;
+    [SerializeField, Min(0f)] private float windVolumeLerpSpeed = 4f;
+
     [Header("Debug")]
     [SerializeField] private bool drawDebugGizmos;
 
@@ -132,6 +146,8 @@ public class ParkourPlayerMovement : MonoBehaviour
             body.interpolation = interpolation;
             body.collisionDetectionMode = collisionDetection;
         }
+
+        EnsureWindSource();
     }
 
     private void OnEnable()
@@ -142,10 +158,21 @@ public class ParkourPlayerMovement : MonoBehaviour
         isDashing = false;
         dashTimer = 0f;
         dashCooldownTimer = 0f;
+        PlayWindLoop();
+    }
+
+    private void OnDisable()
+    {
+        if (windSource != null)
+        {
+            windSource.Stop();
+        }
     }
 
     private void Update()
     {
+        UpdateWindAudio(Time.deltaTime);
+
         if (isRestartingScene)
         {
             return;
@@ -880,4 +907,100 @@ public class ParkourPlayerMovement : MonoBehaviour
 
     private bool IsGrappling => IsAnyControllerGrappling(false);
     private bool IsDirectPullingWithGrapple => IsAnyControllerGrappling(true);
+
+    private void EnsureWindSource()
+    {
+        if (windClip == null)
+        {
+            return;
+        }
+
+        if (windSource == null)
+        {
+            windSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        windSource.playOnAwake = false;
+        windSource.loop = true;
+        windSource.spatialBlend = 0f;
+        windSource.dopplerLevel = 0f;
+        windSource.pitch = 1f;
+        windSource.clip = windClip;
+    }
+
+    private void PlayWindLoop()
+    {
+        if (windClip == null)
+        {
+            return;
+        }
+
+        EnsureWindSource();
+
+        if (windSource == null)
+        {
+            return;
+        }
+
+        windSource.clip = windClip;
+        windSource.volume = windBaseVolume;
+
+        if (!windSource.isPlaying)
+        {
+            windSource.Play();
+        }
+    }
+
+    private void UpdateWindAudio(float deltaTime)
+    {
+        if (windClip == null || body == null)
+        {
+            return;
+        }
+
+        EnsureWindSource();
+
+        if (windSource == null)
+        {
+            return;
+        }
+
+        if (!windSource.isPlaying)
+        {
+            windSource.Play();
+        }
+
+        Vector3 velocity = BodyVelocity;
+        bool grappling = IsGrappling;
+        float maxSpeed = Mathf.Max(windMinSpeed + 0.01f, windMaxSpeed);
+        float speedAmount = Mathf.InverseLerp(windMinSpeed, maxSpeed, velocity.magnitude);
+
+        if (grappling)
+        {
+            Vector3 forward = GetFlatForward();
+            float forwardSpeed = Mathf.Max(0f, Vector3.Dot(velocity, forward));
+            float forwardAmount = Mathf.InverseLerp(windMinSpeed, maxSpeed, forwardSpeed);
+            speedAmount = Mathf.Max(speedAmount, Mathf.Clamp01(forwardAmount + forwardSwingWindBoost));
+        }
+
+        speedAmount = Mathf.Pow(Mathf.Clamp01(speedAmount), windResponseCurve);
+
+        if (isGrounded && !grappling)
+        {
+            speedAmount *= groundedWindMultiplier;
+        }
+        else
+        {
+            speedAmount = Mathf.Clamp01(speedAmount + airborneWindBoost);
+        }
+
+        if (grappling)
+        {
+            speedAmount = Mathf.Clamp01(speedAmount + grappleWindBoost);
+        }
+
+        float targetVolume = Mathf.Lerp(windBaseVolume, windMaxVolume, speedAmount);
+        float blend = deltaTime > 0f ? 1f - Mathf.Exp(-windVolumeLerpSpeed * deltaTime) : 1f;
+        windSource.volume = Mathf.Lerp(windSource.volume, targetVolume, blend);
+    }
 }

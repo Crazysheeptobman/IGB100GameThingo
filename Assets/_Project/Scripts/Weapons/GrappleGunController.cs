@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -52,6 +53,23 @@ public class GrappleGunController : MonoBehaviour
     [SerializeField] private bool orientHookToSurfaceOnLatch = true;
     [SerializeField] private Vector3 hookForwardAxisLocal = Vector3.forward;
 
+    [Header("Audio")]
+    [SerializeField] private AudioClip grappleDeployClip;
+    [SerializeField] private AudioClip grappleReturnClip;
+    [SerializeField] private AudioSource grappleDeploySource;
+    [SerializeField] private AudioSource grappleReturnSource;
+    [SerializeField, Range(0f, 1f)] private float grappleDeployVolume = 0.85f;
+    [SerializeField, Range(0f, 1f)] private float grappleReturnVolume = 0.75f;
+    [SerializeField, Min(0.01f)] private float minimumReturnSoundDuration = 0.05f;
+
+    [Header("Grapple Timer")]
+    [SerializeField, Min(0f)] private float grappleDuration = 3f;
+    [SerializeField] private Slider grappleTimerSlider;
+    [SerializeField] private Image grappleTimerFill;
+    [SerializeField] private Color grappleTimerFullColor = new Color(0.175f, 1f, 0f, 1f);
+    [SerializeField] private Color grappleTimerEmptyColor = Color.red;
+    [SerializeField] private bool hideTimerWhenInactive = true;
+
     private SpringJoint grappleJoint;
     private Rigidbody grappleConnectedBody;
     private Vector3 grappleConnectedLocalPoint;
@@ -71,6 +89,8 @@ public class GrappleGunController : MonoBehaviour
     private Vector3 hookHomeLocalPosition;
     private Quaternion hookHomeLocalRotation;
     private bool hasHookHomePose;
+    private AudioClip generatedReturnClip;
+    private float grappleTimerRemaining;
 
     public bool IsGrappling => isGrappling;
     public bool IsDirectPulling => false;
@@ -185,15 +205,24 @@ public class GrappleGunController : MonoBehaviour
         ResetHookVisualImmediate();
 
         EnsureRopeRenderer();
+        EnsureAudioSources();
+        EnsureGrappleTimerUi();
         SetRopeVisible(false);
+        ResetGrappleTimerUi();
         isPrimaryController = IsPrimaryControllerForPlayerBody();
     }
 
     private void OnDisable()
     {
         EndGrapple(playRetract: false, immediateVisualReset: true);
+        StopReturnSfx();
         swingStartRetryTimer = 0f;
         wasSwingHeldLastFrame = false;
+    }
+
+    private void OnDestroy()
+    {
+        ReleaseGeneratedReturnClip();
     }
 
     private void Update()
@@ -226,6 +255,7 @@ public class GrappleGunController : MonoBehaviour
         bool swingPressed = leftPressed || rightPressed || (swingHeld && !wasSwingHeldLastFrame);
         UpdateSwingStartRetry(swingPressed, swingHeld);
         HandleSwingInput(swingPressed, swingHeld);
+        UpdateGrappleTimer(Time.deltaTime);
         wasSwingHeldLastFrame = swingHeld;
     }
 
@@ -357,6 +387,7 @@ public class GrappleGunController : MonoBehaviour
         activeGrappleMode = GrappleMode.None;
         isGrappling = false;
         SetRopeVisible(true);
+        PlayDeploySfx();
 
         if (hookVisual != null)
         {
@@ -658,11 +689,13 @@ public class GrappleGunController : MonoBehaviour
         }
 
         SetRopeVisible(true);
+        StartGrappleTimer();
     }
 
     private void EndGrapple(bool playRetract, bool immediateVisualReset)
     {
         bool hadActiveHookState = hasPendingGrapple || isGrappling || hookVisualState == HookVisualState.Firing || hookVisualState == HookVisualState.Latched;
+        float expectedReturnDuration = GetExpectedHookReturnDuration();
 
         if (grappleJoint != null)
         {
@@ -677,12 +710,14 @@ public class GrappleGunController : MonoBehaviour
         grappleConnectedBody = null;
         grappleConnectedLocalPoint = Vector3.zero;
         grappleConnectedLocalNormal = Vector3.zero;
+        ResetGrappleTimerUi();
 
         if (immediateVisualReset || hookVisual == null)
         {
             hookVisualState = HookVisualState.Idle;
             ResetHookVisualImmediate();
             SetRopeVisible(false);
+            StopReturnSfx();
             return;
         }
 
@@ -690,12 +725,14 @@ public class GrappleGunController : MonoBehaviour
         {
             hookVisualState = HookVisualState.Retracting;
             SetRopeVisible(true);
+            PlayReturnSfx(expectedReturnDuration);
             return;
         }
 
         hookVisualState = HookVisualState.Idle;
         ResetHookVisualImmediate();
         SetRopeVisible(false);
+        StopReturnSfx();
     }
 
     private void UpdateHookVisual(float deltaTime)
@@ -924,6 +961,93 @@ public class GrappleGunController : MonoBehaviour
         playerBody.AddForce(pullDirection * (pullAcceleration * speedScale), ForceMode.Acceleration);
     }
 
+    private void EnsureGrappleTimerUi()
+    {
+        if (grappleTimerSlider == null)
+        {
+            grappleTimerSlider = FindFirstObjectByType<Slider>(FindObjectsInactive.Include);
+        }
+
+        if (grappleTimerFill == null && grappleTimerSlider != null && grappleTimerSlider.fillRect != null)
+        {
+            grappleTimerFill = grappleTimerSlider.fillRect.GetComponent<Image>();
+        }
+
+        if (grappleTimerSlider == null)
+        {
+            return;
+        }
+
+        grappleTimerSlider.minValue = 0f;
+        grappleTimerSlider.maxValue = 1f;
+        grappleTimerSlider.wholeNumbers = false;
+        grappleTimerSlider.interactable = false;
+    }
+
+    private void StartGrappleTimer()
+    {
+        if (grappleDuration <= 0f)
+        {
+            ResetGrappleTimerUi();
+            return;
+        }
+
+        grappleTimerRemaining = grappleDuration;
+        SetGrappleTimerVisible(true);
+        UpdateGrappleTimerUi(1f);
+    }
+
+    private void UpdateGrappleTimer(float deltaTime)
+    {
+        if (!isGrappling || grappleDuration <= 0f)
+        {
+            return;
+        }
+
+        grappleTimerRemaining = Mathf.Max(0f, grappleTimerRemaining - deltaTime);
+        UpdateGrappleTimerUi(grappleTimerRemaining / grappleDuration);
+
+        if (grappleTimerRemaining <= 0f)
+        {
+            EndGrapple(playRetract: true, immediateVisualReset: false);
+        }
+    }
+
+    private void ResetGrappleTimerUi()
+    {
+        grappleTimerRemaining = 0f;
+        UpdateGrappleTimerUi(0f);
+        SetGrappleTimerVisible(false);
+    }
+
+    private void UpdateGrappleTimerUi(float normalizedTime)
+    {
+        normalizedTime = Mathf.Clamp01(normalizedTime);
+
+        if (grappleTimerSlider != null)
+        {
+            grappleTimerSlider.SetValueWithoutNotify(normalizedTime);
+        }
+
+        if (grappleTimerFill != null)
+        {
+            grappleTimerFill.color = Color.Lerp(grappleTimerEmptyColor, grappleTimerFullColor, normalizedTime);
+        }
+    }
+
+    private void SetGrappleTimerVisible(bool visible)
+    {
+        if (!hideTimerWhenInactive && !visible)
+        {
+            visible = true;
+        }
+
+        if (grappleTimerSlider != null)
+        {
+            grappleTimerSlider.gameObject.SetActive(visible);
+        }
+    }
+
     private void EnsureRopeRenderer()
     {
         if (ropeRenderer == null)
@@ -969,6 +1093,106 @@ public class GrappleGunController : MonoBehaviour
 
         ropeRenderer.enabled = visible;
         ropeRenderer.positionCount = visible ? 2 : 0;
+    }
+
+    private void EnsureAudioSources()
+    {
+        EnsureAudioSource(ref grappleDeploySource);
+        EnsureAudioSource(ref grappleReturnSource);
+    }
+
+    private void EnsureAudioSource(ref AudioSource source)
+    {
+        if (source == null)
+        {
+            source = gameObject.AddComponent<AudioSource>();
+        }
+
+        source.playOnAwake = false;
+        source.loop = false;
+        source.spatialBlend = 0f;
+        source.dopplerLevel = 0f;
+        source.pitch = 1f;
+    }
+
+    private void PlayDeploySfx()
+    {
+        if (grappleDeployClip == null)
+        {
+            return;
+        }
+
+        EnsureAudioSources();
+        grappleDeploySource.PlayOneShot(grappleDeployClip, grappleDeployVolume);
+    }
+
+    private void PlayReturnSfx(float targetDuration)
+    {
+        if (grappleReturnClip == null)
+        {
+            return;
+        }
+
+        EnsureAudioSources();
+        grappleReturnSource.Stop();
+        grappleReturnSource.clip = null;
+        ReleaseGeneratedReturnClip();
+
+        AudioClip clipToPlay = grappleReturnClip;
+        if (targetDuration > 0f)
+        {
+            clipToPlay = AudioTimeStretchUtility.CreateStretchedClip(
+                grappleReturnClip,
+                targetDuration,
+                $"{grappleReturnClip.name}_Return_{targetDuration:0.000}s");
+            if (clipToPlay != grappleReturnClip)
+            {
+                generatedReturnClip = clipToPlay;
+            }
+        }
+
+        grappleReturnSource.clip = clipToPlay;
+        grappleReturnSource.volume = grappleReturnVolume;
+        grappleReturnSource.pitch = 1f;
+        grappleReturnSource.Play();
+    }
+
+    private void StopReturnSfx()
+    {
+        if (grappleReturnSource != null)
+        {
+            grappleReturnSource.Stop();
+            grappleReturnSource.clip = null;
+        }
+
+        ReleaseGeneratedReturnClip();
+    }
+
+    private void ReleaseGeneratedReturnClip()
+    {
+        if (generatedReturnClip == null)
+        {
+            return;
+        }
+
+        Destroy(generatedReturnClip);
+        generatedReturnClip = null;
+    }
+
+    private float GetExpectedHookReturnDuration()
+    {
+        if (hookVisual == null || muzzleTip == null || hookRetractSpeed <= 0f)
+        {
+            return grappleReturnClip != null ? grappleReturnClip.length : 0f;
+        }
+
+        float distance = Vector3.Distance(hookVisual.position, muzzleTip.position);
+        if (distance <= hookSnapDistance)
+        {
+            return minimumReturnSoundDuration;
+        }
+
+        return Mathf.Max(minimumReturnSoundDuration, distance / hookRetractSpeed);
     }
 
     private Vector3 BodyVelocity

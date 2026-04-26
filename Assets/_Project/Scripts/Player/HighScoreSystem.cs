@@ -6,6 +6,7 @@ public class HighScoreSystem : MonoBehaviour
     [SerializeField] private bool showScoreOnGui = true;
     [SerializeField] private Vector2 guiPosition = new Vector2(10f, 10f);
     [SerializeField] private Vector2 guiSize = new Vector2(210f, 55f);
+    [SerializeField] private int fontSize = 20; 
 
     private float startZ, highestZ, elapsedTime;
     public float HighestZ => highestZ;
@@ -28,7 +29,14 @@ public class HighScoreSystem : MonoBehaviour
     private void OnGUI()
     {
         if (!showScoreOnGui) return;
-        GUI.Box(new Rect(guiPosition.x, guiPosition.y, guiSize.x, guiSize.y), $"Score: {Score}\nTime: {FormatTime(elapsedTime)}");
+        
+        GUIStyle style = new GUIStyle(GUI.skin.box);
+        style.fontSize = fontSize;
+        style.alignment = TextAnchor.UpperLeft;
+        
+        GUI.Box(new Rect(guiPosition.x, guiPosition.y, guiSize.x, guiSize.y), 
+                $"Score: {Score}\nTime: {FormatTime(elapsedTime)}", 
+                style);
     }
 
     private static string FormatTime(float seconds)

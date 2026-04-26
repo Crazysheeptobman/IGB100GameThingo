@@ -8,7 +8,6 @@ public class PauseManager : MonoBehaviour
 
     void Update()
     {
-        // Toggle pause with ESC key
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             if (isPaused)
@@ -35,20 +34,19 @@ public class PauseManager : MonoBehaviour
         Time.timeScale = 1f;
         isPaused = false;
         
-        // Hide and lock cursor (adjust if your game needs visible cursor)
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
     }
 
     public void ReturnToMainMenu()
     {
-        Time.timeScale = 1f; // MUST reset time before loading
-        SceneManager.LoadScene("MainMenu"); // Change "MainMenu" to your exact scene name
+        Time.timeScale = 1f; 
+        SceneManager.LoadScene("MainMenu"); 
     }
 
     public void QuitGame()
     {
-        Time.timeScale = 1f; // Reset time
+        Time.timeScale = 1f; 
         #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
         #else

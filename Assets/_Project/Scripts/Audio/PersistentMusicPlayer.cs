@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement; // NEW
 
 [DisallowMultipleComponent]
 public class PersistentMusicPlayer : MonoBehaviour
@@ -11,6 +12,8 @@ public class PersistentMusicPlayer : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float volume = 0.45f;
     [SerializeField] private bool playOnAwake = true;
     [SerializeField] private bool switchToDifferentSceneClip = true;
+    [SerializeField] private string mainMenuSceneName = "MainMenu"; 
+    [SerializeField] private bool destroyOnMainMenu = true; 
 
     private AudioSource musicSource;
 
@@ -32,6 +35,38 @@ public class PersistentMusicPlayer : MonoBehaviour
         if (playOnAwake)
         {
             PlayMusic();
+        }
+
+        // NEW: Subscribe to scene changes
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    // NEW: Clean up event subscription
+    private void OnDestroy()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    // NEW: Handle scene changes
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (scene.name == mainMenuSceneName)
+        {
+            if (destroyOnMainMenu)
+            {
+                if (musicSource != null)
+                {
+                    musicSource.Stop();
+                }
+                Destroy(gameObject);
+            }
+            else
+            {
+                if (musicSource != null && musicSource.isPlaying)
+                {
+                    musicSource.Stop();
+                }
+            }
         }
     }
 

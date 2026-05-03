@@ -4,7 +4,6 @@ using UnityEngine.SceneManagement;
 public class MainMenuController : MonoBehaviour
 {
     [SerializeField] private string gameSceneName = "GameScene";
-    [SerializeField] private GameObject settingsPanel;
 
     public void StartGame()
     {
@@ -13,14 +12,8 @@ public class MainMenuController : MonoBehaviour
 
     public void OpenSettings()
     {
-        if (settingsPanel != null)
-            settingsPanel.SetActive(true);
-    }
-
-    public void CloseSettings()
-    {
-        if (settingsPanel != null)
-            settingsPanel.SetActive(false);
+        PlayerPrefs.SetString("PreviousScene", SceneManager.GetActiveScene().name);
+        SceneManager.LoadScene("SettingPanel");
     }
 
     public void QuitGame()

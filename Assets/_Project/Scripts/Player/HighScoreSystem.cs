@@ -6,7 +6,7 @@ public class HighScoreSystem : MonoBehaviour
     [SerializeField] private bool showScoreOnGui = true;
     [SerializeField] private Vector2 guiPosition = new Vector2(10f, 10f);
     [SerializeField] private Vector2 guiSize = new Vector2(210f, 55f);
-    [SerializeField] private int fontSize = 20; 
+    [SerializeField] private int fontSize = 40; 
 
     private float startZ, highestZ, elapsedTime;
     public float HighestZ => highestZ;

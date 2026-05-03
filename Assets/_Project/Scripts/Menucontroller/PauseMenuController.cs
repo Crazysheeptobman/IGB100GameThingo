@@ -53,4 +53,11 @@ public class PauseManager : MonoBehaviour
             Application.Quit();
         #endif
     }
+
+    public void OpenSettings()
+    {
+        Time.timeScale = 1f;
+        PlayerPrefs.SetString("PreviousScene", SceneManager.GetActiveScene().name);
+        SceneManager.LoadScene("SettingPanel");
+    }
 }

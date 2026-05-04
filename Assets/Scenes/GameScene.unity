@@ -446,6 +446,7 @@ MonoBehaviour:
   hookLaunchSpeed: 85
   hookRetractSpeed: 110
   hookSnapDistance: 0.04
+  hookCollisionRadius: 0.08
   rotateHookToVelocity: 1
   orientHookToSurfaceOnLatch: 1
   hookForwardAxisLocal: {x: 0, y: 0, z: 1}
@@ -845,7 +846,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GrappleCrosshairIndicator
   grappleController: {fileID: 652540975}
   crosshairImage: {fileID: 2125249214}
-  reachableSprite: {fileID: 21300000, guid: 3247582710e974d058358ff34a1762d5, type: 3}
+  reachableSprite: {fileID: 21300000, guid: 70a5efbbfb594448b80e805f911117ad, type: 3}
   unreachableSprite: {fileID: 21300000, guid: 70a5efbbfb594448b80e805f911117ad, type: 3}
   reachableCrosshair: {fileID: 0}
   unreachableCrosshair: {fileID: 0}
@@ -1505,6 +1506,7 @@ MonoBehaviour:
   hookLaunchSpeed: 85
   hookRetractSpeed: 110
   hookSnapDistance: 0.04
+  hookCollisionRadius: 0.08
   rotateHookToVelocity: 1
   orientHookToSurfaceOnLatch: 1
   hookForwardAxisLocal: {x: 0, y: 0, z: 1}
@@ -2006,7 +2008,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ParkourPlayerMovement
   moveReference: {fileID: 916302468}
   walkSpeed: 12
-  sprintSpeed: 15
   groundAcceleration: 75
   groundDeceleration: 60
   airAcceleration: 28
@@ -2017,10 +2018,6 @@ MonoBehaviour:
   grappleAirControlMaxSpeed: 60
   preserveGrappleMomentum: 1
   allowAirControlDuringDirectPull: 1
-  enableDash: 1
-  dashSpeed: 22
-  dashDuration: 0.14
-  dashCooldown: 0.45
   jumpVelocity: 8.5
   coyoteTime: 0.12
   jumpBufferTime: 0.15
@@ -2033,21 +2030,6 @@ MonoBehaviour:
     m_Bits: 4294967295
   groundCheckDistance: 0.08
   maxGroundAngle: 52
-  enableWallMovement: 1
-  wallMask:
-    serializedVersion: 2
-    m_Bits: 4294967295
-  wallCheckDistance: 0.65
-  wallProbeHeightOffset: 0.6
-  maxWallUpDot: 0.2
-  wallClimbSpeed: 5
-  wallClimbAcceleration: 16
-  wallStickForce: 14
-  wallSlideMaxSpeed: 3.5
-  wallJumpUpVelocity: 8
-  wallJumpAwayVelocity: 7
-  wallJumpForwardBonus: 1.75
-  wallClimbInputThreshold: 0.05
   configureRigidbodyOnAwake: 1
   interpolation: 1
   collisionDetection: 2

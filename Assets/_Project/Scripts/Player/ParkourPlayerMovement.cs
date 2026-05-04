@@ -14,7 +14,6 @@ public class ParkourPlayerMovement : MonoBehaviour
 
     [Header("Movement")]
     [SerializeField, Min(0f)] private float walkSpeed = 8f;
-    [SerializeField, Min(0f)] private float sprintSpeed = 12f;
     [SerializeField, Min(0f)] private float groundAcceleration = 75f;
     [SerializeField, Min(0f)] private float groundDeceleration = 60f;
     [SerializeField, Min(0f)] private float airAcceleration = 28f;
@@ -27,12 +26,6 @@ public class ParkourPlayerMovement : MonoBehaviour
     [SerializeField, Min(0f)] private float grappleAirControlMaxSpeed = 60f;
     [SerializeField] private bool preserveGrappleMomentum = true;
     [SerializeField] private bool allowAirControlDuringDirectPull = true;
-
-    [Header("Dash")]
-    [SerializeField] private bool enableDash = true;
-    [SerializeField, Min(0f)] private float dashSpeed = 22f;
-    [SerializeField, Min(0f)] private float dashDuration = 0.14f;
-    [SerializeField, Min(0f)] private float dashCooldown = 0.45f;
 
     [Header("Jump")]
     [SerializeField, Min(0f)] private float jumpVelocity = 8.5f;
@@ -49,21 +42,6 @@ public class ParkourPlayerMovement : MonoBehaviour
     [SerializeField] private LayerMask groundMask = ~0;
     [SerializeField, Min(0f)] private float groundCheckDistance = 0.08f;
     [SerializeField, Range(0f, 89f)] private float maxGroundAngle = 52f;
-
-    [Header("Wall Movement")]
-    [SerializeField] private bool enableWallMovement = true;
-    [SerializeField] private LayerMask wallMask = ~0;
-    [SerializeField, Min(0f)] private float wallCheckDistance = 0.65f;
-    [SerializeField, Min(0f)] private float wallProbeHeightOffset = 0.6f;
-    [SerializeField, Range(0f, 1f)] private float maxWallUpDot = 0.2f;
-    [SerializeField, Min(0f)] private float wallClimbSpeed = 5f;
-    [SerializeField, Min(0f)] private float wallClimbAcceleration = 16f;
-    [SerializeField, Min(0f)] private float wallStickForce = 14f;
-    [SerializeField, Min(0f)] private float wallSlideMaxSpeed = 3.5f;
-    [SerializeField, Min(0f)] private float wallJumpUpVelocity = 8f;
-    [SerializeField, Min(0f)] private float wallJumpAwayVelocity = 7f;
-    [SerializeField, Min(0f)] private float wallJumpForwardBonus = 1.75f;
-    [SerializeField, Range(-1f, 1f)] private float wallClimbInputThreshold = 0.05f;
 
     [Header("Rigidbody Setup")]
     [SerializeField] private bool configureRigidbodyOnAwake = true;
@@ -91,27 +69,16 @@ public class ParkourPlayerMovement : MonoBehaviour
     [SerializeField] private bool drawDebugGizmos;
 
     public bool IsGrounded => isGrounded;
-    public bool IsWallClimbing => isWallClimbing;
     public Vector3 CurrentVelocity => BodyVelocity;
 
     private Rigidbody body;
     private CapsuleCollider capsule;
 
     private Vector2 moveInput;
-    private bool sprintHeld;
     private bool jumpHeld;
-    private bool dashQueued;
-    private bool isDashing;
-    private float dashTimer;
-    private float dashCooldownTimer;
-    private Vector3 dashDirection = Vector3.zero;
 
     private bool isGrounded;
     private Vector3 groundNormal = Vector3.up;
-
-    private bool hasWall;
-    private Vector3 wallNormal = Vector3.zero;
-    private bool isWallClimbing;
 
     private float timeSinceLastGrounded;
     private float jumpBufferCounter;
@@ -154,10 +121,6 @@ public class ParkourPlayerMovement : MonoBehaviour
     {
         jumpBufferCounter = 0f;
         timeSinceLastGrounded = coyoteTime;
-        dashQueued = false;
-        isDashing = false;
-        dashTimer = 0f;
-        dashCooldownTimer = 0f;
         PlayWindLoop();
     }
 
@@ -195,12 +158,6 @@ public class ParkourPlayerMovement : MonoBehaviour
     private void FixedUpdate()
     {
         RefreshGroundState();
-        RefreshWallState();
-
-        if (dashCooldownTimer > 0f)
-        {
-            dashCooldownTimer = Mathf.Max(0f, dashCooldownTimer - Time.fixedDeltaTime);
-        }
 
         if (isGrounded)
         {
@@ -211,41 +168,16 @@ public class ParkourPlayerMovement : MonoBehaviour
             timeSinceLastGrounded += Time.fixedDeltaTime;
         }
 
-        if (dashQueued)
-        {
-            TryStartDash();
-            dashQueued = false;
-        }
-
-        if (isDashing)
-        {
-            dashTimer -= Time.fixedDeltaTime;
-            if (dashTimer <= 0f)
-            {
-                isDashing = false;
-            }
-        }
-
         TryConsumeJump();
-        if (isDashing)
-        {
-            ApplyDashMovement();
-        }
-        else
-        {
-            ApplyHorizontalMovement();
-            ApplyWallMotion();
-        }
+        ApplyHorizontalMovement();
         ApplyGravity();
     }
 
     private void ReadInput()
     {
         Vector2 nextMoveInput = Vector2.zero;
-        bool nextSprintHeld = false;
         bool nextJumpHeld = false;
         bool jumpPressedThisFrame = false;
-        bool dashPressedThisFrame = false;
 #if ENABLE_LEGACY_INPUT_MANAGER
         bool readWithInputSystem = false;
 #endif
@@ -280,10 +212,8 @@ public class ParkourPlayerMovement : MonoBehaviour
             }
 
             nextMoveInput += new Vector2(x, y);
-            nextSprintHeld |= keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed;
             nextJumpHeld |= keyboard.spaceKey.isPressed;
             jumpPressedThisFrame |= keyboard.spaceKey.wasPressedThisFrame;
-            dashPressedThisFrame |= keyboard.eKey.wasPressedThisFrame;
 #if ENABLE_LEGACY_INPUT_MANAGER
             readWithInputSystem = true;
 #endif
@@ -292,7 +222,6 @@ public class ParkourPlayerMovement : MonoBehaviour
         if (gamepad != null)
         {
             nextMoveInput += gamepad.leftStick.ReadValue();
-            nextSprintHeld |= gamepad.leftStickButton.isPressed;
             nextJumpHeld |= gamepad.buttonSouth.isPressed;
             jumpPressedThisFrame |= gamepad.buttonSouth.wasPressedThisFrame;
 #if ENABLE_LEGACY_INPUT_MANAGER
@@ -305,10 +234,8 @@ public class ParkourPlayerMovement : MonoBehaviour
         if (!readWithInputSystem)
         {
             nextMoveInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
-            nextSprintHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
             nextJumpHeld = Input.GetButton("Jump");
             jumpPressedThisFrame = Input.GetButtonDown("Jump");
-            dashPressedThisFrame = Input.GetKeyDown(KeyCode.E);
         }
 #endif
 
@@ -318,17 +245,11 @@ public class ParkourPlayerMovement : MonoBehaviour
         }
 
         moveInput = nextMoveInput;
-        sprintHeld = nextSprintHeld;
         jumpHeld = nextJumpHeld;
 
         if (jumpPressedThisFrame)
         {
             jumpBufferCounter = jumpBufferTime;
-        }
-
-        if (dashPressedThisFrame)
-        {
-            dashQueued = true;
         }
     }
 
@@ -393,103 +314,10 @@ public class ParkourPlayerMovement : MonoBehaviour
         groundNormal = hit.normal;
     }
 
-    private void RefreshWallState()
-    {
-        hasWall = false;
-        wallNormal = Vector3.zero;
-
-        if (!enableWallMovement || isGrounded)
-        {
-            return;
-        }
-
-        Vector3 origin = transform.position + Vector3.up * wallProbeHeightOffset;
-        Transform reference = moveReference != null ? moveReference : transform;
-
-        Vector3 forward = reference.forward;
-        forward.y = 0f;
-        if (forward.sqrMagnitude < 0.0001f)
-        {
-            forward = transform.forward;
-            forward.y = 0f;
-        }
-        forward.Normalize();
-
-        Vector3 right = reference.right;
-        right.y = 0f;
-        if (right.sqrMagnitude < 0.0001f)
-        {
-            right = transform.right;
-            right.y = 0f;
-        }
-        right.Normalize();
-
-        Vector3 diagonalA = (forward + right).normalized;
-        Vector3 diagonalB = (forward - right).normalized;
-
-        Vector3[] directions =
-        {
-            forward,
-            -forward,
-            right,
-            -right,
-            diagonalA,
-            -diagonalA,
-            diagonalB,
-            -diagonalB
-        };
-
-        float bestDistance = float.MaxValue;
-
-        for (int i = 0; i < directions.Length; i++)
-        {
-            Vector3 direction = directions[i];
-            if (direction.sqrMagnitude < 0.0001f)
-            {
-                continue;
-            }
-
-            if (!Physics.Raycast(origin, direction, out RaycastHit hit, wallCheckDistance, wallMask, QueryTriggerInteraction.Ignore))
-            {
-                continue;
-            }
-
-            float upDot = Mathf.Abs(Vector3.Dot(hit.normal, Vector3.up));
-            if (upDot > maxWallUpDot)
-            {
-                continue;
-            }
-
-            if (hit.distance >= bestDistance)
-            {
-                continue;
-            }
-
-            bestDistance = hit.distance;
-            hasWall = true;
-            wallNormal = hit.normal;
-        }
-    }
-
     private void TryConsumeJump()
     {
         if (jumpBufferCounter <= 0f)
         {
-            return;
-        }
-
-        if (enableWallMovement && hasWall && !isGrounded)
-        {
-            Vector3 horizontalVelocity = GetHorizontalVelocity();
-            Vector3 forward = GetFlatForward();
-
-            Vector3 launchVelocity = wallNormal * wallJumpAwayVelocity;
-            launchVelocity += Vector3.up * wallJumpUpVelocity;
-            launchVelocity += forward * wallJumpForwardBonus;
-
-            SetBodyVelocity(horizontalVelocity * 0.35f + launchVelocity);
-            jumpBufferCounter = 0f;
-            isWallClimbing = false;
             return;
         }
 
@@ -522,8 +350,7 @@ public class ParkourPlayerMovement : MonoBehaviour
 
         if (isGrounded)
         {
-            float targetSpeed = sprintHeld ? sprintSpeed : walkSpeed;
-            Vector3 targetVelocity = moveDirection * targetSpeed;
+            Vector3 targetVelocity = moveDirection * walkSpeed;
             Vector3 velocityDelta = targetVelocity - currentHorizontalVelocity;
             float accel = hasMoveInput ? groundAcceleration : groundDeceleration;
             Vector3 clampedDelta = Vector3.ClampMagnitude(velocityDelta, accel * Time.fixedDeltaTime);
@@ -537,8 +364,7 @@ public class ParkourPlayerMovement : MonoBehaviour
             return;
         }
 
-        float airTargetSpeed = sprintHeld ? sprintSpeed : walkSpeed;
-        Vector3 airTargetVelocity = moveDirection * airTargetSpeed;
+        Vector3 airTargetVelocity = moveDirection * walkSpeed;
         Vector3 airVelocityDelta = airTargetVelocity - currentHorizontalVelocity;
         Vector3 airClampedDelta = Vector3.ClampMagnitude(airVelocityDelta, airAcceleration * Time.fixedDeltaTime);
         Vector3 projectedAirVelocity = currentHorizontalVelocity + airClampedDelta;
@@ -632,70 +458,6 @@ public class ParkourPlayerMovement : MonoBehaviour
         body.AddForce(velocityDelta, ForceMode.VelocityChange);
     }
 
-    private void TryStartDash()
-    {
-        if (!enableDash || dashSpeed <= 0f || dashDuration <= 0f || isDashing || dashCooldownTimer > 0f)
-        {
-            return;
-        }
-
-        Vector3 desiredDirection = GetDesiredMoveDirection();
-        if (desiredDirection.sqrMagnitude < 0.0001f)
-        {
-            desiredDirection = GetFlatForward();
-        }
-
-        if (desiredDirection.sqrMagnitude < 0.0001f)
-        {
-            return;
-        }
-
-        dashDirection = desiredDirection.normalized;
-        dashTimer = dashDuration;
-        dashCooldownTimer = dashCooldown;
-        isDashing = true;
-        isWallClimbing = false;
-    }
-
-    private void ApplyDashMovement()
-    {
-        Vector3 velocity = BodyVelocity;
-        velocity.x = dashDirection.x * dashSpeed;
-        velocity.z = dashDirection.z * dashSpeed;
-        SetBodyVelocity(velocity);
-    }
-
-    private void ApplyWallMotion()
-    {
-        isWallClimbing = false;
-
-        if (!enableWallMovement || isGrounded || !hasWall)
-        {
-            return;
-        }
-
-        Vector3 velocity = BodyVelocity;
-        bool wantsClimb = moveInput.y > wallClimbInputThreshold;
-
-        if (wantsClimb)
-        {
-            isWallClimbing = true;
-            float climbBlend = 1f - Mathf.Exp(-wallClimbAcceleration * Time.fixedDeltaTime);
-            velocity.y = Mathf.Lerp(velocity.y, wallClimbSpeed, climbBlend);
-        }
-        else if (velocity.y < -wallSlideMaxSpeed)
-        {
-            velocity.y = -wallSlideMaxSpeed;
-        }
-
-        SetBodyVelocity(velocity);
-
-        if (wallStickForce > 0f)
-        {
-            body.AddForce(-wallNormal * wallStickForce, ForceMode.Acceleration);
-        }
-    }
-
     private void ApplyGravity()
     {
         Vector3 velocity = BodyVelocity;
@@ -709,11 +471,6 @@ public class ParkourPlayerMovement : MonoBehaviour
         else if (velocity.y < 0f)
         {
             gravityMultiplier = fallGravityMultiplier;
-        }
-
-        if (isWallClimbing)
-        {
-            gravityMultiplier *= 0.35f;
         }
 
         velocity.y -= gravity * gravityMultiplier * Time.fixedDeltaTime;
@@ -802,17 +559,8 @@ public class ParkourPlayerMovement : MonoBehaviour
             return;
         }
 
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawWireSphere(transform.position + Vector3.up * wallProbeHeightOffset, wallCheckDistance);
-
         Gizmos.color = isGrounded ? Color.green : Color.red;
         Gizmos.DrawLine(transform.position, transform.position + Vector3.down * (groundCheckDistance + 0.5f));
-
-        if (hasWall)
-        {
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawRay(transform.position + Vector3.up * wallProbeHeightOffset, wallNormal);
-        }
     }
 
     private Vector3 BodyVelocity

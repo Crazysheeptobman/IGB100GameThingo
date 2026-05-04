@@ -1,12 +1,16 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
 
+[DefaultExecutionOrder(300)]
 [DisallowMultipleComponent]
 public class GrappleGunController : MonoBehaviour
 {
+    private const int HookCastHitCapacity = 32;
+
     [Header("References")]
     [SerializeField] private Rigidbody playerBody;
     [SerializeField] private Transform playerCamera;
@@ -49,6 +53,8 @@ public class GrappleGunController : MonoBehaviour
     [SerializeField, Min(0f)] private float hookLaunchSpeed = 85f;
     [SerializeField, Min(0f)] private float hookRetractSpeed = 110f;
     [SerializeField, Min(0f)] private float hookSnapDistance = 0.04f;
+    [SerializeField, Min(0f), Tooltip("Radius used when sweeping the fired hook through the world. Set to 0 for a thin ray.")]
+    private float hookCollisionRadius = 0.08f;
     [SerializeField] private bool rotateHookToVelocity = true;
     [SerializeField] private bool orientHookToSurfaceOnLatch = true;
     [SerializeField] private Vector3 hookForwardAxisLocal = Vector3.forward;
@@ -89,6 +95,12 @@ public class GrappleGunController : MonoBehaviour
     private Vector3 hookHomeLocalPosition;
     private Quaternion hookHomeLocalRotation;
     private bool hasHookHomePose;
+    private Vector3 hookWorldPosition;
+    private bool hasHookWorldPosition;
+    private Vector3 hookFlightDirection;
+    private float hookFlightDistanceRemaining;
+    private readonly RaycastHit[] hookCastHits = new RaycastHit[HookCastHitCapacity];
+    private Collider[] ignoredHookColliders = new Collider[0];
     private AudioClip generatedReturnClip;
     private float grappleTimerRemaining;
 
@@ -207,6 +219,7 @@ public class GrappleGunController : MonoBehaviour
         EnsureRopeRenderer();
         EnsureAudioSources();
         EnsureGrappleTimerUi();
+        RefreshIgnoredHookColliders();
         SetRopeVisible(false);
         ResetGrappleTimerUi();
         isPrimaryController = IsPrimaryControllerForPlayerBody();
@@ -374,13 +387,17 @@ public class GrappleGunController : MonoBehaviour
             return false;
         }
 
-        if (!TryGetReachableGrappleTarget(out RaycastHit hit))
+        RefreshIgnoredHookColliders();
+
+        Vector3 launchOrigin = muzzleTip.position;
+        if (!TryGetGrappleCastDirection(out Vector3 launchDirection))
         {
             return false;
         }
 
+        bool hasInitialHit = TryGetGrappleHitPoint(out RaycastHit hit);
+
         EndGrapple(playRetract: false, immediateVisualReset: false);
-        CaptureAnchor(hit);
 
         hasPendingGrapple = true;
         pendingGrappleMode = grappleMode;
@@ -391,16 +408,37 @@ public class GrappleGunController : MonoBehaviour
 
         if (hookVisual != null)
         {
-            hookVisualState = HookVisualState.Firing;
-            hookVisual.position = muzzleTip.position;
-            Vector3 launchDirection = grapplePoint - hookVisual.position;
-            if (rotateHookToVelocity && launchDirection.sqrMagnitude > 0.0001f)
+            if (hasInitialHit)
             {
-                SetHookFacing(launchDirection.normalized);
+                Vector3 launchOffset = hit.point - launchOrigin;
+                if (launchOffset.sqrMagnitude > 0.0001f)
+                {
+                    launchDirection = launchOffset.normalized;
+                }
+            }
+
+            grapplePoint = launchOrigin + launchDirection * maxGrappleDistance;
+            grappleSurfaceNormal = -launchDirection;
+            hookWorldPosition = launchOrigin;
+            hasHookWorldPosition = true;
+            hookFlightDirection = launchDirection;
+            hookFlightDistanceRemaining = maxGrappleDistance;
+            hookVisualState = HookVisualState.Firing;
+            hookVisual.position = hookWorldPosition;
+            if (rotateHookToVelocity)
+            {
+                SetHookFacing(hookFlightDirection);
             }
         }
         else
         {
+            if (!hasInitialHit || Vector3.Distance(playerBody.worldCenterOfMass, hit.point) < minimumAttachDistance)
+            {
+                EndGrapple(playRetract: false, immediateVisualReset: true);
+                return false;
+            }
+
+            CaptureAnchor(hit);
             hookVisualState = HookVisualState.Latched;
             ActivatePendingGrapple();
         }
@@ -427,29 +465,42 @@ public class GrappleGunController : MonoBehaviour
     private bool TryGetGrappleHitPoint(out RaycastHit hit)
     {
         Vector3 castOrigin = muzzleTip != null ? muzzleTip.position : transform.position;
-        Vector3 castDirection = GetFallbackCastDirection();
+        if (!TryGetGrappleCastDirection(out Vector3 castDirection))
+        {
+            hit = default;
+            return false;
+        }
+
+        return TryGetNearestHookHit(castOrigin, castDirection, maxGrappleDistance, 0f, out hit);
+    }
+
+    private bool TryGetGrappleCastDirection(out Vector3 castDirection)
+    {
+        Vector3 castOrigin = muzzleTip != null ? muzzleTip.position : transform.position;
+        castDirection = GetFallbackCastDirection();
 
         if (useCameraAssistAim && playerCamera != null)
         {
             Ray lookRay = new Ray(playerCamera.position, playerCamera.forward);
-            Vector3 lookPoint = Physics.Raycast(lookRay, out RaycastHit lookHit, maxGrappleDistance, grappleMask, QueryTriggerInteraction.Ignore)
+            Vector3 lookPoint = TryGetNearestHookHit(lookRay.origin, lookRay.direction, maxGrappleDistance, 0f, out RaycastHit lookHit)
                 ? lookHit.point
                 : lookRay.GetPoint(maxGrappleDistance);
 
             Vector3 assistDirection = lookPoint - castOrigin;
             if (assistDirection.sqrMagnitude > 0.0001f)
             {
-                castDirection = assistDirection.normalized;
+                castDirection = assistDirection;
             }
         }
 
         if (castDirection.sqrMagnitude < 0.0001f)
         {
-            hit = default;
+            castDirection = default;
             return false;
         }
 
-        return Physics.Raycast(castOrigin, castDirection, out hit, maxGrappleDistance, grappleMask, QueryTriggerInteraction.Ignore);
+        castDirection.Normalize();
+        return true;
     }
 
     private bool IsPrimaryControllerForPlayerBody()
@@ -750,23 +801,14 @@ public class GrappleGunController : MonoBehaviour
             }
             case HookVisualState.Firing:
             {
-                MoveHookTowards(grapplePoint, hookLaunchSpeed, deltaTime, out bool reachedTarget);
-                if (reachedTarget)
-                {
-                    hookVisualState = HookVisualState.Latched;
-                    if (orientHookToSurfaceOnLatch)
-                    {
-                        OrientHookToSurface();
-                    }
-
-                    ActivatePendingGrapple();
-                }
-
+                AdvanceFiringHook(deltaTime);
                 break;
             }
             case HookVisualState.Latched:
             {
-                hookVisual.position = grapplePoint;
+                hookWorldPosition = grapplePoint;
+                hasHookWorldPosition = true;
+                hookVisual.position = hookWorldPosition;
                 if (orientHookToSurfaceOnLatch)
                 {
                     OrientHookToSurface();
@@ -789,6 +831,66 @@ public class GrappleGunController : MonoBehaviour
         }
     }
 
+    private void AdvanceFiringHook(float deltaTime)
+    {
+        if (hookVisual == null)
+        {
+            return;
+        }
+
+        if (hookFlightDirection.sqrMagnitude < 0.0001f || hookFlightDistanceRemaining <= 0f)
+        {
+            EndGrapple(playRetract: true, immediateVisualReset: false);
+            return;
+        }
+
+        if (!hasHookWorldPosition)
+        {
+            hookWorldPosition = hookVisual.position;
+            hasHookWorldPosition = true;
+        }
+
+        float stepDistance = hookLaunchSpeed <= 0f || deltaTime <= 0f
+            ? hookFlightDistanceRemaining
+            : Mathf.Min(hookLaunchSpeed * deltaTime, hookFlightDistanceRemaining);
+
+        Vector3 startPosition = hookWorldPosition;
+        Vector3 endPosition = startPosition + hookFlightDirection * stepDistance;
+
+        if (TryGetHookImpactBetween(startPosition, endPosition, out RaycastHit impactHit))
+        {
+            CaptureAnchor(impactHit);
+            hookWorldPosition = grapplePoint;
+            hasHookWorldPosition = true;
+            hookVisual.position = hookWorldPosition;
+            hookFlightDirection = Vector3.zero;
+            hookFlightDistanceRemaining = 0f;
+
+            hookVisualState = HookVisualState.Latched;
+            if (orientHookToSurfaceOnLatch)
+            {
+                OrientHookToSurface();
+            }
+
+            ActivatePendingGrapple();
+            return;
+        }
+
+        hookWorldPosition = endPosition;
+        hookVisual.position = hookWorldPosition;
+        hookFlightDistanceRemaining = Mathf.Max(0f, hookFlightDistanceRemaining - stepDistance);
+
+        if (rotateHookToVelocity)
+        {
+            SetHookFacing(hookFlightDirection);
+        }
+
+        if (hookFlightDistanceRemaining <= Mathf.Max(0.0001f, hookSnapDistance))
+        {
+            EndGrapple(playRetract: true, immediateVisualReset: false);
+        }
+    }
+
     private void MoveHookTowards(Vector3 targetPosition, float speed, float deltaTime, out bool reachedTarget)
     {
         if (hookVisual == null)
@@ -799,13 +901,22 @@ public class GrappleGunController : MonoBehaviour
 
         if (deltaTime <= 0f || speed <= 0f)
         {
+            hookWorldPosition = targetPosition;
+            hasHookWorldPosition = true;
             hookVisual.position = targetPosition;
             reachedTarget = true;
             return;
         }
 
-        Vector3 startPosition = hookVisual.position;
+        if (!hasHookWorldPosition)
+        {
+            hookWorldPosition = hookVisual.position;
+            hasHookWorldPosition = true;
+        }
+
+        Vector3 startPosition = hookWorldPosition;
         Vector3 endPosition = Vector3.MoveTowards(startPosition, targetPosition, speed * deltaTime);
+        hookWorldPosition = endPosition;
         hookVisual.position = endPosition;
 
         Vector3 travelDirection = endPosition - startPosition;
@@ -818,6 +929,7 @@ public class GrappleGunController : MonoBehaviour
         reachedTarget = (endPosition - targetPosition).sqrMagnitude <= snapDistance * snapDistance;
         if (reachedTarget)
         {
+            hookWorldPosition = targetPosition;
             hookVisual.position = targetPosition;
         }
     }
@@ -850,6 +962,7 @@ public class GrappleGunController : MonoBehaviour
         {
             hookVisual.localPosition = hookHomeLocalPosition;
             hookVisual.localRotation = hookHomeLocalRotation;
+            ClearHookFlightState();
             return;
         }
 
@@ -858,6 +971,8 @@ public class GrappleGunController : MonoBehaviour
             hookVisual.position = muzzleTip.position;
             hookVisual.rotation = muzzleTip.rotation;
         }
+
+        ClearHookFlightState();
     }
 
     private void SetHookFacing(Vector3 worldDirection)
@@ -916,7 +1031,7 @@ public class GrappleGunController : MonoBehaviour
     {
         if (hookVisual != null && hookVisualState != HookVisualState.Idle)
         {
-            return hookVisual.position;
+            return hasHookWorldPosition ? hookWorldPosition : hookVisual.position;
         }
 
         if (isGrappling || hasPendingGrapple)
@@ -925,6 +1040,165 @@ public class GrappleGunController : MonoBehaviour
         }
 
         return muzzleTip != null ? muzzleTip.position : transform.position;
+    }
+
+    private bool TryGetHookImpactBetween(Vector3 startPosition, Vector3 endPosition, out RaycastHit hit)
+    {
+        Vector3 travel = endPosition - startPosition;
+        float travelDistance = travel.magnitude;
+        if (travelDistance <= 0.0001f)
+        {
+            hit = default;
+            return false;
+        }
+
+        return TryGetNearestHookHit(startPosition, travel / travelDistance, travelDistance, hookCollisionRadius, out hit);
+    }
+
+    private bool TryGetNearestHookHit(Vector3 origin, Vector3 direction, float distance, float radius, out RaycastHit nearestHit)
+    {
+        int hitCount = radius > 0f
+            ? Physics.SphereCastNonAlloc(origin, radius, direction, hookCastHits, distance, grappleMask, QueryTriggerInteraction.Ignore)
+            : Physics.RaycastNonAlloc(origin, direction, hookCastHits, distance, grappleMask, QueryTriggerInteraction.Ignore);
+
+        nearestHit = default;
+        bool hasHit = false;
+        float nearestDistance = float.PositiveInfinity;
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            RaycastHit hit = hookCastHits[i];
+            if (hit.collider == null || IsSelfHookHit(hit))
+            {
+                continue;
+            }
+
+            if (!hasHit || hit.distance < nearestDistance)
+            {
+                nearestHit = hit;
+                nearestDistance = hit.distance;
+                hasHit = true;
+            }
+        }
+
+        return hasHit;
+    }
+
+    private bool IsSelfHookHit(RaycastHit hit)
+    {
+        Collider hitCollider = hit.collider;
+        if (hitCollider == null)
+        {
+            return false;
+        }
+
+        if (IsIgnoredHookCollider(hitCollider))
+        {
+            return true;
+        }
+
+        if (hit.rigidbody != null && hit.rigidbody == playerBody)
+        {
+            return true;
+        }
+
+        if (hitCollider.attachedRigidbody != null && hitCollider.attachedRigidbody == playerBody)
+        {
+            return true;
+        }
+
+        Transform hitTransform = hitCollider.transform;
+        if (hitTransform == null)
+        {
+            return false;
+        }
+
+        if (playerBody != null && hitTransform.IsChildOf(playerBody.transform))
+        {
+            return true;
+        }
+
+        if (hitTransform.IsChildOf(transform))
+        {
+            return true;
+        }
+
+        if (hookVisual != null && hitTransform.IsChildOf(hookVisual))
+        {
+            return true;
+        }
+
+        return IsTaggedPlayer(hitTransform);
+    }
+
+    private bool IsIgnoredHookCollider(Collider hitCollider)
+    {
+        for (int i = 0; i < ignoredHookColliders.Length; i++)
+        {
+            if (ignoredHookColliders[i] == hitCollider)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsTaggedPlayer(Transform hitTransform)
+    {
+        Transform current = hitTransform;
+        while (current != null)
+        {
+            if (current.CompareTag("Player"))
+            {
+                return true;
+            }
+
+            current = current.parent;
+        }
+
+        return false;
+    }
+
+    private void RefreshIgnoredHookColliders()
+    {
+        List<Collider> ignoredColliders = new List<Collider>();
+
+        AddIgnoredColliders(ignoredColliders, playerBody != null ? playerBody.transform.root : null);
+        AddIgnoredColliders(ignoredColliders, playerBody != null ? playerBody.transform : null);
+        AddIgnoredColliders(ignoredColliders, transform.root);
+        AddIgnoredColliders(ignoredColliders, transform);
+        AddIgnoredColliders(ignoredColliders, gunPivot);
+        AddIgnoredColliders(ignoredColliders, muzzleTip);
+        AddIgnoredColliders(ignoredColliders, hookVisual);
+
+        ignoredHookColliders = ignoredColliders.ToArray();
+    }
+
+    private static void AddIgnoredColliders(List<Collider> ignoredColliders, Transform root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        Collider[] colliders = root.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider collider = colliders[i];
+            if (collider != null && !ignoredColliders.Contains(collider))
+            {
+                ignoredColliders.Add(collider);
+            }
+        }
+    }
+
+    private void ClearHookFlightState()
+    {
+        hookWorldPosition = Vector3.zero;
+        hasHookWorldPosition = false;
+        hookFlightDirection = Vector3.zero;
+        hookFlightDistanceRemaining = 0f;
     }
 
     private void ApplySwingPullForces(Vector3 toAnchor, float distanceToAnchor)
@@ -1186,7 +1460,8 @@ public class GrappleGunController : MonoBehaviour
             return grappleReturnClip != null ? grappleReturnClip.length : 0f;
         }
 
-        float distance = Vector3.Distance(hookVisual.position, muzzleTip.position);
+        Vector3 currentHookPosition = hasHookWorldPosition ? hookWorldPosition : hookVisual.position;
+        float distance = Vector3.Distance(currentHookPosition, muzzleTip.position);
         if (distance <= hookSnapDistance)
         {
             return minimumReturnSoundDuration;

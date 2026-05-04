@@ -40,6 +40,8 @@ public class DetachedFpsLook : MonoBehaviour
     private float pitch;
     private Camera playerCameraComponent;
 
+    public bool IsPaused = false;
+
     private void Reset()
     {
         playerYawRoot = transform;
@@ -125,7 +127,7 @@ public class DetachedFpsLook : MonoBehaviour
 
     private void Update()
     {
-        if (playerCamera == null)
+        if (playerCamera == null || IsPaused)
         {
             return;
         }
@@ -142,7 +144,7 @@ public class DetachedFpsLook : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (playerCamera == null || cameraFollowTarget == null)
+        if (playerCamera == null || cameraFollowTarget == null || IsPaused)
         {
             return;
         }

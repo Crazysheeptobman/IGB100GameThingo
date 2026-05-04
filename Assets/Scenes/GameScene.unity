@@ -1896,6 +1896,7 @@ MonoBehaviour:
   ignoreVerticalSpeedForFov: 1
   lockCursor: 1
   hideCursor: 1
+  IsPaused: 0
 --- !u!136 &916302465
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -3199,6 +3200,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PauseManager
   pauseMenuPanel: {fileID: 279170941}
+  fpsLook: {fileID: 916302464}
 --- !u!4 &1655105568
 Transform:
   m_ObjectHideFlags: 0

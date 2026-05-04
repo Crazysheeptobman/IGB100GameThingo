@@ -4,7 +4,17 @@ using UnityEngine.SceneManagement;
 public class PauseManager : MonoBehaviour
 {
     public GameObject pauseMenuPanel;
+    public DetachedFpsLook fpsLook; // drag your camera controller here in inspector
+
     private bool isPaused = false;
+
+    void Start()
+    {
+        if (fpsLook == null)
+        {
+            fpsLook = FindObjectOfType<DetachedFpsLook>();
+        }
+    }
 
     void Update()
     {
@@ -22,8 +32,10 @@ public class PauseManager : MonoBehaviour
         pauseMenuPanel.SetActive(true);
         Time.timeScale = 0f;
         isPaused = true;
-        
-        // Show and unlock cursor
+
+        if (fpsLook != null)
+            fpsLook.IsPaused = true;
+
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
     }
@@ -33,25 +45,29 @@ public class PauseManager : MonoBehaviour
         pauseMenuPanel.SetActive(false);
         Time.timeScale = 1f;
         isPaused = false;
-        
+
+        if (fpsLook != null)
+            fpsLook.IsPaused = false;
+
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
     }
 
     public void ReturnToMainMenu()
     {
-        Time.timeScale = 1f; 
-        SceneManager.LoadScene("MainMenu"); 
+        Time.timeScale = 1f;
+        SceneManager.LoadScene("MainMenu");
     }
 
     public void QuitGame()
     {
-        Time.timeScale = 1f; 
-        #if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
-        #else
-            Application.Quit();
-        #endif
+        Time.timeScale = 1f;
+
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
     }
 
     public void OpenSettings()

@@ -4,11 +4,17 @@ using UnityEngine.SceneManagement;
 public class MainMenuController : MonoBehaviour
 {
     [SerializeField] private string gameSceneName = "GameScene";
+    [SerializeField] private string NewSceneName = "TutorialScreen";
 
     public void StartGame()
     {
         SceneManager.LoadScene(gameSceneName);
     }
+        public void OpenTutorial()
+    {
+        SceneManager.LoadScene(NewSceneName);
+    }
+    
 
     public void OpenSettings()
     {

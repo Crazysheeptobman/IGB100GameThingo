@@ -1536,17 +1536,17 @@ MonoBehaviour:
   grappleMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  maxGrappleDistance: 65
+  maxGrappleDistance: 150
   minimumAttachDistance: 1.5
   initialRopeTightness: 0.9
   useCameraAssistAim: 1
-  swingSpring: 5.5
+  swingSpring: 3
   swingDamper: 2.5
   swingMassScale: 4
   enableReelIn: 1
-  reelInSpeed: 16
-  pullAcceleration: 28
-  maxPullSpeed: 24
+  reelInSpeed: 50
+  pullAcceleration: 50
+  maxPullSpeed: 300
   minimumRopeLength: 1.75
   autoDetachDistance: 1.35
   holdToMaintainGrapple: 1
@@ -1554,10 +1554,10 @@ MonoBehaviour:
   autoCreateRopeRenderer: 1
   ropeWidth: 0.025
   ropeColor: {r: 0.9, g: 0.95, b: 1, a: 1}
-  hookLaunchSpeed: 85
-  hookRetractSpeed: 110
+  hookLaunchSpeed: 200
+  hookRetractSpeed: 250
   hookSnapDistance: 0.04
-  hookCollisionRadius: 0.08
+  hookCollisionRadius: 0.2
   rotateHookToVelocity: 1
   orientHookToSurfaceOnLatch: 1
   hookForwardAxisLocal: {x: 0, y: 0, z: 1}
@@ -2062,8 +2062,8 @@ MonoBehaviour:
   walkSpeed: 12
   groundAcceleration: 75
   groundDeceleration: 60
-  airAcceleration: 28
-  maxAirSpeed: 11
+  airAcceleration: 50
+  maxAirSpeed: 100
   normalizeMoveInput: 1
   grappleController: {fileID: 0}
   grappleAirControlAcceleration: 16
@@ -2073,10 +2073,10 @@ MonoBehaviour:
   jumpVelocity: 8.5
   coyoteTime: 0.12
   jumpBufferTime: 0.15
-  gravity: 30
-  lowJumpGravityMultiplier: 1.8
+  gravity: 40
+  lowJumpGravityMultiplier: 1.5
   fallGravityMultiplier: 2.1
-  maxFallSpeed: 38
+  maxFallSpeed: 50
   groundMask:
     serializedVersion: 2
     m_Bits: 4294967295

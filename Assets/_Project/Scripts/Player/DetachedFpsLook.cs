@@ -131,6 +131,10 @@ public class DetachedFpsLook : MonoBehaviour
         {
             return;
         }
+        if (DeathScreenController.IsDead)
+        {
+            return;
+        }
 
         Vector2 lookDeltaDegrees = ReadLookInputDegrees();
         yaw += lookDeltaDegrees.x;

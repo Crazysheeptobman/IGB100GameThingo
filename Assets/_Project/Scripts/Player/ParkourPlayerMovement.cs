@@ -73,7 +73,6 @@ public class ParkourPlayerMovement : MonoBehaviour
 
     private Rigidbody body;
     private CapsuleCollider capsule;
-    private HighScoreSystem highScoreSystem;
 
     private Vector2 moveInput;
     private bool jumpHeld;
@@ -116,7 +115,6 @@ public class ParkourPlayerMovement : MonoBehaviour
         }
 
         EnsureWindSource();
-        highScoreSystem = FindObjectOfType<HighScoreSystem>();
     }
 
     private void OnEnable()
@@ -134,44 +132,6 @@ public class ParkourPlayerMovement : MonoBehaviour
         }
     }
 
-    private void OnCollisionEnter(Collision collision)
-    {
-        TryAwardSpecialTargetScore(collision.gameObject);
-    }
-
-    private void OnTriggerEnter(Collider other)
-    {
-        TryAwardSpecialTargetScore(other.gameObject);
-    }
-
-    private bool TryAwardSpecialTargetScore(GameObject target)
-    {
-        if (target == null)
-        {
-            return false;
-        }
-
-        SegmentOptionMarker marker = target.GetComponentInParent<SegmentOptionMarker>();
-        if (marker == null || marker.elementId != 8 || marker.scoreAwarded)
-        {
-            return false;
-        }
-
-        if (highScoreSystem == null)
-        {
-            highScoreSystem = FindObjectOfType<HighScoreSystem>();
-        }
-
-        if (highScoreSystem == null)
-        {
-            return false;
-        }
-
-        marker.scoreAwarded = true;
-        highScoreSystem.AddPoints(200);
-        return true;
-    }
-
     private void Update()
     {
         UpdateWindAudio(Time.deltaTime);
@@ -183,9 +143,17 @@ public class ParkourPlayerMovement : MonoBehaviour
 
         ReadInput();
 
-        if (ShouldRestartScene())
+        // Check for manual restart (R key) - bypasses death screen
+        if (WasRestartPressedThisFrame())
         {
             RestartScene();
+            return;
+        }
+
+        // Check for death (falling below death level) - shows death screen
+        if (transform.position.y < deathYLevel)
+        {
+            TriggerDeath();
             return;
         }
 
@@ -293,11 +261,6 @@ public class ParkourPlayerMovement : MonoBehaviour
         }
     }
 
-    private bool ShouldRestartScene()
-    {
-        return transform.position.y < deathYLevel || WasRestartPressedThisFrame();
-    }
-
     private bool WasRestartPressedThisFrame()
     {
 #if ENABLE_INPUT_SYSTEM
@@ -312,6 +275,14 @@ public class ParkourPlayerMovement : MonoBehaviour
 #else
         return false;
 #endif
+    }
+
+    private void TriggerDeath()
+    {
+        Debug.Log("Player died");
+
+        isRestartingScene = true;
+        DeathScreenController.ShowDeathScreen();
     }
 
     private void RestartScene()

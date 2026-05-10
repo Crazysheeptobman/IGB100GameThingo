@@ -454,27 +454,46 @@ public class SegmentGen : MonoBehaviour
             return null;
         }
 
+        GameObject instance;
         if (!usePooling)
         {
-            return Instantiate(prefab);
+            instance = Instantiate(prefab);
         }
-
-        if (!pooledSegmentsByPrefab.TryGetValue(segmentOptionIndex, out Queue<GameObject> pool))
+        else
         {
-            pool = new Queue<GameObject>();
-            pooledSegmentsByPrefab[segmentOptionIndex] = pool;
-        }
-
-        while (pool.Count > 0)
-        {
-            GameObject pooledSegment = pool.Dequeue();
-            if (pooledSegment != null)
+            if (!pooledSegmentsByPrefab.TryGetValue(segmentOptionIndex, out Queue<GameObject> pool))
             {
-                return pooledSegment;
+                pool = new Queue<GameObject>();
+                pooledSegmentsByPrefab[segmentOptionIndex] = pool;
+            }
+
+            instance = null;
+            while (pool.Count > 0)
+            {
+                GameObject pooledSegment = pool.Dequeue();
+                if (pooledSegment != null)
+                {
+                    instance = pooledSegment;
+                    break;
+                }
+            }
+
+            if (instance == null)
+            {
+                instance = Instantiate(prefab);
             }
         }
 
-        return Instantiate(prefab);
+        SegmentOptionMarker marker = instance.GetComponent<SegmentOptionMarker>();
+        if (marker == null)
+        {
+            marker = instance.AddComponent<SegmentOptionMarker>();
+        }
+
+        marker.elementId = segmentOptionIndex;
+        marker.scoreAwarded = false;
+
+        return instance;
     }
 
     private void DespawnOldestSegment()

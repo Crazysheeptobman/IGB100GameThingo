@@ -9,8 +9,10 @@ public class HighScoreSystem : MonoBehaviour
     [SerializeField] private int fontSize = 40; 
 
     private float startZ, highestZ, elapsedTime;
+    private int bonusScore;
+
     public float HighestZ => highestZ;
-    public int Score => Mathf.Max(0, Mathf.FloorToInt(highestZ - startZ));
+    public int Score => Mathf.Max(0, Mathf.FloorToInt(highestZ - startZ)) + bonusScore;
 
     private void Awake()
     {
@@ -50,5 +52,11 @@ public class HighScoreSystem : MonoBehaviour
         if (player == null) return;
         startZ = highestZ = player.position.z;
         elapsedTime = 0f;
+        bonusScore = 0;
+    }
+
+    public void AddPoints(int points)
+    {
+        bonusScore += Mathf.Max(0, points);
     }
 }

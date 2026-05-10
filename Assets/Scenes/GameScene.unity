@@ -3389,6 +3389,8 @@ MonoBehaviour:
     weight: 1
   - prefab: {fileID: 6188282186356670611, guid: d47ad79755dfb40688f28a003aacdfa4, type: 3}
     weight: 1
+  - prefab: {fileID: 100000, guid: 9273b478e99d9e1428b5738dfa153353, type: 3}
+    weight: 1
   legacySegmentPrefabs:
   - {fileID: 6188282186356670611, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
   legacySegmentSelectionWeights: []

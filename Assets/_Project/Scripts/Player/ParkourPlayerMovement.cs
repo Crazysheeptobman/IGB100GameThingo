@@ -73,6 +73,7 @@ public class ParkourPlayerMovement : MonoBehaviour
 
     private Rigidbody body;
     private CapsuleCollider capsule;
+    private HighScoreSystem highScoreSystem;
 
     private Vector2 moveInput;
     private bool jumpHeld;
@@ -115,6 +116,7 @@ public class ParkourPlayerMovement : MonoBehaviour
         }
 
         EnsureWindSource();
+        highScoreSystem = FindObjectOfType<HighScoreSystem>();
     }
 
     private void OnEnable()
@@ -130,6 +132,44 @@ public class ParkourPlayerMovement : MonoBehaviour
         {
             windSource.Stop();
         }
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        TryAwardSpecialTargetScore(collision.gameObject);
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        TryAwardSpecialTargetScore(other.gameObject);
+    }
+
+    private bool TryAwardSpecialTargetScore(GameObject target)
+    {
+        if (target == null)
+        {
+            return false;
+        }
+
+        SegmentOptionMarker marker = target.GetComponentInParent<SegmentOptionMarker>();
+        if (marker == null || marker.elementId != 8 || marker.scoreAwarded)
+        {
+            return false;
+        }
+
+        if (highScoreSystem == null)
+        {
+            highScoreSystem = FindObjectOfType<HighScoreSystem>();
+        }
+
+        if (highScoreSystem == null)
+        {
+            return false;
+        }
+
+        marker.scoreAwarded = true;
+        highScoreSystem.AddPoints(200);
+        return true;
     }
 
     private void Update()

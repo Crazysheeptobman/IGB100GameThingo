@@ -11,6 +11,8 @@ public class SegmentEnvironmentSpawnerWindow : EditorWindow
 
     [SerializeField] private GameObject targetSegmentPrefab;
     [SerializeField] private DefaultAsset environmentPrefabFolder;
+    [SerializeField] private DefaultAsset secondaryEnvironmentPrefabFolder;
+    [SerializeField] private float secondaryFolderSpawnChance = 5f;
     [SerializeField] private int spawnAmount = 12;
     [SerializeField] private Vector3 colliderPadding;
     [SerializeField] private Vector3 rotationMin = Vector3.zero;
@@ -21,6 +23,7 @@ public class SegmentEnvironmentSpawnerWindow : EditorWindow
     [SerializeField] private bool showLoadedPrefabs;
 
     private readonly List<GameObject> environmentPrefabs = new List<GameObject>();
+    private readonly List<GameObject> secondaryEnvironmentPrefabs = new List<GameObject>();
     private Vector2 scrollPosition;
     private string statusMessage = "Choose a segment prefab or select one in the Hierarchy, then generate.";
 
@@ -112,6 +115,21 @@ public class SegmentEnvironmentSpawnerWindow : EditorWindow
             {
                 RefreshEnvironmentPrefabList();
             }
+        }
+
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Secondary Environment", EditorStyles.boldLabel);
+        EditorGUI.BeginChangeCheck();
+        secondaryEnvironmentPrefabFolder = (DefaultAsset)EditorGUILayout.ObjectField("Secondary Prefab Folder", secondaryEnvironmentPrefabFolder, typeof(DefaultAsset), false);
+        secondaryFolderSpawnChance = EditorGUILayout.Slider("Secondary Folder Chance", secondaryFolderSpawnChance, 0f, 100f);
+        if (EditorGUI.EndChangeCheck())
+        {
+            RefreshEnvironmentPrefabList();
+        }
+
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.LabelField("Secondary Loaded", secondaryEnvironmentPrefabs.Count.ToString());
         }
 
         showLoadedPrefabs = EditorGUILayout.Foldout(showLoadedPrefabs, "Loaded Prefab Names");
@@ -206,14 +224,32 @@ public class SegmentEnvironmentSpawnerWindow : EditorWindow
     private void RefreshEnvironmentPrefabList()
     {
         environmentPrefabs.Clear();
+        secondaryEnvironmentPrefabs.Clear();
 
-        string folderPath = GetPrefabFolderPath();
-        if (string.IsNullOrEmpty(folderPath))
+        string folderPath = GetPrefabFolderPath(environmentPrefabFolder);
+        string secondaryFolderPath = GetPrefabFolderPath(secondaryEnvironmentPrefabFolder);
+
+        if (string.IsNullOrEmpty(folderPath) && string.IsNullOrEmpty(secondaryFolderPath))
         {
-            statusMessage = "Pick a valid Project folder containing environment prefabs.";
+            statusMessage = "Pick one or more valid Project folders containing environment prefabs.";
             return;
         }
 
+        if (!string.IsNullOrEmpty(folderPath))
+        {
+            LoadPrefabsFromFolder(folderPath, environmentPrefabs);
+        }
+
+        if (!string.IsNullOrEmpty(secondaryFolderPath))
+        {
+            LoadPrefabsFromFolder(secondaryFolderPath, secondaryEnvironmentPrefabs);
+        }
+
+        statusMessage = GetLoadedPrefabsMessage(folderPath, secondaryFolderPath);
+    }
+
+    private void LoadPrefabsFromFolder(string folderPath, List<GameObject> outputList)
+    {
         string[] prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { folderPath });
         Array.Sort(prefabGuids, StringComparer.Ordinal);
 
@@ -223,29 +259,60 @@ public class SegmentEnvironmentSpawnerWindow : EditorWindow
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(assetPath);
             if (prefab != null)
             {
-                environmentPrefabs.Add(prefab);
+                outputList.Add(prefab);
             }
         }
-
-        statusMessage = environmentPrefabs.Count > 0
-            ? $"Loaded {environmentPrefabs.Count} environment prefab(s) from {folderPath}."
-            : $"No prefabs found in {folderPath}.";
     }
 
-    private string GetPrefabFolderPath()
+    private string GetLoadedPrefabsMessage(string primaryPath, string secondaryPath)
     {
-        if (environmentPrefabFolder == null)
+        if (!string.IsNullOrEmpty(primaryPath) && !string.IsNullOrEmpty(secondaryPath))
+        {
+            return $"Loaded {environmentPrefabs.Count} primary + {secondaryEnvironmentPrefabs.Count} secondary environment prefab(s).";
+        }
+
+        if (!string.IsNullOrEmpty(primaryPath))
+        {
+            return environmentPrefabs.Count > 0
+                ? $"Loaded {environmentPrefabs.Count} environment prefab(s) from {primaryPath}."
+                : $"No prefabs found in {primaryPath}.";
+        }
+
+        return secondaryEnvironmentPrefabs.Count > 0
+            ? $"Loaded {secondaryEnvironmentPrefabs.Count} environment prefab(s) from {secondaryPath}."
+            : $"No prefabs found in {secondaryPath}.";
+    }
+
+    private string GetPrefabFolderPath(DefaultAsset prefabFolder)
+    {
+        if (prefabFolder == null)
         {
             return string.Empty;
         }
 
-        string folderPath = AssetDatabase.GetAssetPath(environmentPrefabFolder);
+        string folderPath = AssetDatabase.GetAssetPath(prefabFolder);
         return AssetDatabase.IsValidFolder(folderPath) ? folderPath : string.Empty;
     }
 
     private bool CanGenerate()
     {
-        return environmentPrefabs.Count > 0;
+        return environmentPrefabs.Count > 0 || secondaryEnvironmentPrefabs.Count > 0;
+    }
+
+    private List<GameObject> ChoosePrefabList(System.Random random)
+    {
+        if (secondaryEnvironmentPrefabs.Count == 0)
+        {
+            return environmentPrefabs;
+        }
+
+        if (environmentPrefabs.Count == 0)
+        {
+            return secondaryEnvironmentPrefabs;
+        }
+
+        float chance = Mathf.Clamp(secondaryFolderSpawnChance, 0f, 100f);
+        return RandomRange(random, 0f, 100f) < chance ? secondaryEnvironmentPrefabs : environmentPrefabs;
     }
 
     private void UseProjectSelection()
@@ -372,7 +439,13 @@ public class SegmentEnvironmentSpawnerWindow : EditorWindow
 
         for (int i = 0; i < spawnAmount; i++)
         {
-            GameObject sourcePrefab = environmentPrefabs[random.Next(environmentPrefabs.Count)];
+            List<GameObject> sourceList = ChoosePrefabList(random);
+            if (sourceList.Count == 0)
+            {
+                continue;
+            }
+
+            GameObject sourcePrefab = sourceList[random.Next(sourceList.Count)];
             GameObject instance = PrefabUtility.InstantiatePrefab(sourcePrefab, generatedRoot.transform) as GameObject;
             if (instance == null)
             {

@@ -36,7 +36,7 @@ public class GrappleCrosshairIndicator : MonoBehaviour
         ResolveGrappleController();
 
         bool isReachable = grappleController != null && grappleController.HasReachableGrappleTarget;
-        ApplyState(isReachable);
+        ApplyState(false);
     }
 
     private void ResolveGrappleController()

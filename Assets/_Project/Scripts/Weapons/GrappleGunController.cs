@@ -664,6 +664,31 @@ public class GrappleGunController : MonoBehaviour
             grappleConnectedLocalPoint = Vector3.zero;
             grappleConnectedLocalNormal = Vector3.zero;
         }
+
+        TryAwardGrappleTargetScore(hit.collider?.gameObject);
+    }
+
+    private void TryAwardGrappleTargetScore(GameObject target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        SegmentOptionMarker marker = target.GetComponentInParent<SegmentOptionMarker>();
+        if (marker == null || marker.elementId != 8 || marker.scoreAwarded)
+        {
+            return;
+        }
+
+        HighScoreSystem highScore = FindObjectOfType<HighScoreSystem>();
+        if (highScore == null)
+        {
+            return;
+        }
+
+        marker.scoreAwarded = true;
+        highScore.AddPoints(200);
     }
 
     private void RefreshDynamicAnchor()

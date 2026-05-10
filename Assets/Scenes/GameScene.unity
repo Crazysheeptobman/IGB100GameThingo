@@ -3666,8 +3666,6 @@ MonoBehaviour:
     weight: 1
   - prefab: {fileID: 6188282186356670611, guid: d47ad79755dfb40688f28a003aacdfa4, type: 3}
     weight: 1
-  - prefab: {fileID: 100000, guid: 9273b478e99d9e1428b5738dfa153353, type: 3}
-    weight: 1
   legacySegmentPrefabs:
   - {fileID: 6188282186356670611, guid: 537c62d1d283b46e18674cd77d6bfc55, type: 3}
   legacySegmentSelectionWeights: []
@@ -3686,6 +3684,12 @@ MonoBehaviour:
   maxSequentialRepeats: 1
   useDeterministicSeed: 0
   deterministicSeed: 12345
+  spawnCollectables: 1
+  collectables:
+  - prefab: {fileID: 4419203367921293861, guid: e172774f77dea4beaaa3691dd2969000, type: 3}
+    weight: 1
+  collectableSpawnOneInSegments: 10
+  collectableSpawnPadding: 0
   usePooling: 1
   poolPrewarmPerPrefab: 1
   maxSpawnsPerFrame: 8

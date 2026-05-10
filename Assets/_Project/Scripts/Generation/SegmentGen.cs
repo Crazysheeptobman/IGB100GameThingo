@@ -6,8 +6,17 @@ using UnityEngine.Serialization;
 [DisallowMultipleComponent]
 public class SegmentGen : MonoBehaviour
 {
+    private const string CollectableRootName = "Generated Collectables";
+
     [Serializable]
     private struct SegmentOption
+    {
+        public GameObject prefab;
+        [Min(0f)] public float weight;
+    }
+
+    [Serializable]
+    private struct CollectableOption
     {
         public GameObject prefab;
         [Min(0f)] public float weight;
@@ -40,6 +49,14 @@ public class SegmentGen : MonoBehaviour
     [SerializeField, Min(1)] private int maxSequentialRepeats = 1;
     [SerializeField] private bool useDeterministicSeed;
     [SerializeField] private int deterministicSeed = 12345;
+
+    [Header("Collectables")]
+    [SerializeField] private bool spawnCollectables = true;
+    [SerializeField] private CollectableOption[] collectables = Array.Empty<CollectableOption>();
+    [SerializeField, Min(1), Tooltip("A value of 10 gives each spawned segment a 1 in 10 chance to spawn one collectable.")]
+    private int collectableSpawnOneInSegments = 10;
+    [SerializeField, Min(0f), Tooltip("Shrinks the chosen segment BoxCollider volume inward before picking a random collectable position.")]
+    private float collectableSpawnPadding;
 
     [Header("Performance")]
     [SerializeField] private bool usePooling = true;
@@ -186,6 +203,8 @@ public class SegmentGen : MonoBehaviour
         maxSpawnsPerFrame = Mathf.Max(1, maxSpawnsPerFrame);
         maxDespawnsPerFrame = Mathf.Max(1, maxDespawnsPerFrame);
         poolPrewarmPerPrefab = Mathf.Max(0, poolPrewarmPerPrefab);
+        collectableSpawnOneInSegments = Mathf.Max(1, collectableSpawnOneInSegments);
+        collectableSpawnPadding = Mathf.Max(0f, collectableSpawnPadding);
     }
 
     private void MigrateLegacySegmentsIfNeeded()
@@ -221,21 +240,36 @@ public class SegmentGen : MonoBehaviour
 
     private void ApplyDefaultWeights()
     {
-        if (segments == null)
+        if (segments != null)
+        {
+            for (int i = 0; i < segments.Length; i++)
+            {
+                if (segments[i].weight > 0f)
+                {
+                    continue;
+                }
+
+                SegmentOption option = segments[i];
+                option.weight = 1f;
+                segments[i] = option;
+            }
+        }
+
+        if (collectables == null)
         {
             return;
         }
 
-        for (int i = 0; i < segments.Length; i++)
+        for (int i = 0; i < collectables.Length; i++)
         {
-            if (segments[i].weight > 0f)
+            if (collectables[i].weight > 0f)
             {
                 continue;
             }
 
-            SegmentOption option = segments[i];
+            CollectableOption option = collectables[i];
             option.weight = 1f;
-            segments[i] = option;
+            collectables[i] = option;
         }
     }
 
@@ -319,6 +353,7 @@ public class SegmentGen : MonoBehaviour
         };
 
         activeSegments.Add(activeSegment);
+        SpawnCollectableForSegment(instance);
         nextSpawnDistance += tileSize;
     }
 
@@ -496,6 +531,206 @@ public class SegmentGen : MonoBehaviour
         return instance;
     }
 
+    private void SpawnCollectableForSegment(GameObject segmentInstance)
+    {
+        if (segmentInstance == null)
+        {
+            return;
+        }
+
+        Transform collectableRoot = segmentInstance.transform.Find(CollectableRootName);
+        ClearCollectableRoot(collectableRoot);
+
+        if (!ShouldSpawnCollectable())
+        {
+            return;
+        }
+
+        int collectableOptionIndex = ChooseWeightedCollectableIndex();
+        if (collectableOptionIndex < 0)
+        {
+            return;
+        }
+
+        if (collectableRoot == null)
+        {
+            collectableRoot = GetOrCreateCollectableRoot(segmentInstance.transform);
+        }
+
+        BoxCollider spawnBounds = FindSegmentSpawnBounds(segmentInstance, collectableRoot);
+        if (spawnBounds == null)
+        {
+            Debug.LogWarning($"SegmentGen could not find a BoxCollider spawn volume on {segmentInstance.name}.", segmentInstance);
+            return;
+        }
+
+        GameObject collectablePrefab = collectables[collectableOptionIndex].prefab;
+        if (collectablePrefab == null)
+        {
+            return;
+        }
+
+        Vector3 spawnPosition = GetRandomPointInsideBox(spawnBounds);
+        Quaternion spawnRotation = segmentInstance.transform.rotation * collectablePrefab.transform.rotation;
+        Instantiate(collectablePrefab, spawnPosition, spawnRotation, collectableRoot);
+    }
+
+    private bool ShouldSpawnCollectable()
+    {
+        if (!spawnCollectables || collectables == null || collectables.Length == 0)
+        {
+            return false;
+        }
+
+        float spawnChance = 1f / collectableSpawnOneInSegments;
+        return NextRandomFloat01() < spawnChance;
+    }
+
+    private int ChooseWeightedCollectableIndex()
+    {
+        if (collectables == null || collectables.Length == 0)
+        {
+            return -1;
+        }
+
+        float totalWeight = 0f;
+        int validCollectableCount = 0;
+        for (int i = 0; i < collectables.Length; i++)
+        {
+            if (collectables[i].prefab == null)
+            {
+                continue;
+            }
+
+            validCollectableCount++;
+            totalWeight += GetCollectableWeight(i);
+        }
+
+        if (validCollectableCount == 0 || totalWeight <= 0f)
+        {
+            Debug.LogWarning("SegmentGen tried to spawn a collectable, but no valid collectable prefabs are assigned.", this);
+            return -1;
+        }
+
+        float randomValue = NextRandomFloat01() * totalWeight;
+        float cumulativeWeight = 0f;
+        int fallbackIndex = -1;
+
+        for (int i = 0; i < collectables.Length; i++)
+        {
+            if (collectables[i].prefab == null)
+            {
+                continue;
+            }
+
+            fallbackIndex = i;
+            cumulativeWeight += GetCollectableWeight(i);
+            if (randomValue <= cumulativeWeight)
+            {
+                return i;
+            }
+        }
+
+        return fallbackIndex;
+    }
+
+    private float GetCollectableWeight(int collectableIndex)
+    {
+        float weight = collectables[collectableIndex].weight;
+        return weight > 0f ? weight : 1f;
+    }
+
+    private Transform GetOrCreateCollectableRoot(Transform segmentTransform)
+    {
+        Transform existingRoot = segmentTransform.Find(CollectableRootName);
+        if (existingRoot != null)
+        {
+            return existingRoot;
+        }
+
+        GameObject collectableRoot = new GameObject(CollectableRootName);
+        collectableRoot.transform.SetParent(segmentTransform, false);
+        collectableRoot.transform.localPosition = Vector3.zero;
+        collectableRoot.transform.localRotation = Quaternion.identity;
+        collectableRoot.transform.localScale = Vector3.one;
+        return collectableRoot.transform;
+    }
+
+    private void ClearCollectableRoot(Transform collectableRoot)
+    {
+        if (collectableRoot == null)
+        {
+            return;
+        }
+
+        for (int i = collectableRoot.childCount - 1; i >= 0; i--)
+        {
+            GameObject child = collectableRoot.GetChild(i).gameObject;
+            child.SetActive(false);
+
+            if (Application.isPlaying)
+            {
+                Destroy(child);
+            }
+            else
+            {
+                DestroyImmediate(child);
+            }
+        }
+    }
+
+    private BoxCollider FindSegmentSpawnBounds(GameObject segmentInstance, Transform ignoredRoot)
+    {
+        BoxCollider[] colliders = segmentInstance.GetComponentsInChildren<BoxCollider>(includeInactive: true);
+        BoxCollider bestCollider = null;
+        float bestVolume = 0f;
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            BoxCollider boxCollider = colliders[i];
+            if (boxCollider == null || !boxCollider.enabled)
+            {
+                continue;
+            }
+
+            if (ignoredRoot != null && boxCollider.transform.IsChildOf(ignoredRoot))
+            {
+                continue;
+            }
+
+            Vector3 scaledSize = Vector3.Scale(boxCollider.size, boxCollider.transform.lossyScale);
+            float volume = Mathf.Abs(scaledSize.x * scaledSize.y * scaledSize.z);
+            bool shouldUseCollider = bestCollider == null
+                || (boxCollider.isTrigger && !bestCollider.isTrigger)
+                || (boxCollider.isTrigger == bestCollider.isTrigger && volume > bestVolume);
+
+            if (!shouldUseCollider)
+            {
+                continue;
+            }
+
+            bestCollider = boxCollider;
+            bestVolume = volume;
+        }
+
+        return bestCollider;
+    }
+
+    private Vector3 GetRandomPointInsideBox(BoxCollider boxCollider)
+    {
+        Vector3 halfSize = new Vector3(
+            Mathf.Max(0f, Mathf.Abs(boxCollider.size.x) * 0.5f - collectableSpawnPadding),
+            Mathf.Max(0f, Mathf.Abs(boxCollider.size.y) * 0.5f - collectableSpawnPadding),
+            Mathf.Max(0f, Mathf.Abs(boxCollider.size.z) * 0.5f - collectableSpawnPadding));
+
+        Vector3 localOffset = new Vector3(
+            Mathf.Lerp(-halfSize.x, halfSize.x, NextRandomFloat01()),
+            Mathf.Lerp(-halfSize.y, halfSize.y, NextRandomFloat01()),
+            Mathf.Lerp(-halfSize.z, halfSize.z, NextRandomFloat01()));
+
+        return boxCollider.transform.TransformPoint(boxCollider.center + localOffset);
+    }
+
     private void DespawnOldestSegment()
     {
         ActiveSegment oldest = activeSegments[0];
@@ -512,6 +747,7 @@ public class SegmentGen : MonoBehaviour
             return;
         }
 
+        ClearCollectableRoot(oldest.Instance.transform.Find(CollectableRootName));
         oldest.Instance.SetActive(false);
         oldest.Instance.transform.SetParent(segmentParent, true);
 
@@ -536,6 +772,7 @@ public class SegmentGen : MonoBehaviour
 
             if (usePooling)
             {
+                ClearCollectableRoot(activeSegment.Instance.transform.Find(CollectableRootName));
                 activeSegment.Instance.SetActive(false);
 
                 if (!pooledSegmentsByPrefab.TryGetValue(activeSegment.SegmentOptionIndex, out Queue<GameObject> pool))
@@ -611,6 +848,8 @@ public class SegmentGen : MonoBehaviour
         maxSpawnsPerFrame = Mathf.Max(1, maxSpawnsPerFrame);
         maxDespawnsPerFrame = Mathf.Max(1, maxDespawnsPerFrame);
         poolPrewarmPerPrefab = Mathf.Max(0, poolPrewarmPerPrefab);
+        collectableSpawnOneInSegments = Mathf.Max(1, collectableSpawnOneInSegments);
+        collectableSpawnPadding = Mathf.Max(0f, collectableSpawnPadding);
         MigrateLegacySegmentsIfNeeded();
         ApplyDefaultWeights();
     }

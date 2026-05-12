@@ -4,7 +4,7 @@ using UnityEngine.SceneManagement;
 public class PauseManager : MonoBehaviour
 {
     public GameObject pauseMenuPanel;
-    public DetachedFpsLook fpsLook; // drag your camera controller here in inspector
+    public DetachedFpsLook fpsLook;
 
     private bool isPaused = false;
 

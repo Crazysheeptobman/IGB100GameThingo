@@ -2,11 +2,13 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using System.Collections;
+using TMPro;
 
 public class DeathScreenController : MonoBehaviour
 {
     [Header("UI References")]
     [SerializeField] private GameObject deathScreenPanel;
+    [SerializeField] private TextMeshProUGUI respawnCountdownText;
     
     [Header("Settings")]
     [SerializeField, Min(0f)] private float displayDuration = 2f;
@@ -24,7 +26,6 @@ public class DeathScreenController : MonoBehaviour
     
     private void Awake()
     {
-        // Singleton pattern to ensure only one death screen exists
         if (instance != null && instance != this)
         {
             Destroy(gameObject);
@@ -33,73 +34,75 @@ public class DeathScreenController : MonoBehaviour
         
         instance = this;
         
-        // Make sure death screen is hidden at start
         if (deathScreenPanel != null)
-        {
             deathScreenPanel.SetActive(false);
-        }
         
-        // Set up canvas group if we want fade animation
         if (useFadeIn && canvasGroup != null)
-        {
             canvasGroup.alpha = 0f;
-        }
+
+        if (respawnCountdownText != null)
+            respawnCountdownText.gameObject.SetActive(false);
     }
-    
-    /// <summary>
-    /// Call this method when the player dies
-    /// </summary>
+
     public static void ShowDeathScreen()
     {
         Debug.Log("ShowDeathScreen called. Instance = " + instance);
 
         if (instance != null && !instance.isShowingDeathScreen)
-        {
             instance.StartCoroutine(instance.DeathSequence());
-        }
     }
     
     private IEnumerator DeathSequence()
     {
         isShowingDeathScreen = true;
         
-        // Pause the game
         if (pauseGameOnDeath)
-        {
             Time.timeScale = 0f;
-        }
         
-        // Show the death screen panel
         if (deathScreenPanel != null)
-        {
             deathScreenPanel.SetActive(true);
-        }
         
-        // Fade in animation (if enabled)
         if (useFadeIn && canvasGroup != null)
-        {
             yield return StartCoroutine(FadeIn());
+
+        float countdownDuration = displayDuration - (useFadeIn ? fadeInDuration : 0f);
+        if (respawnCountdownText != null)
+        {
+            respawnCountdownText.gameObject.SetActive(true);
+            yield return StartCoroutine(RunCountdown(countdownDuration));
+            respawnCountdownText.gameObject.SetActive(false);
+        }
+        else
+        {
+            yield return new WaitForSecondsRealtime(countdownDuration);
         }
         
-        // Wait for the display duration (using unscaled time since game is paused)
-        yield return new WaitForSecondsRealtime(displayDuration);
-        
-        // Hide the death screen
         if (deathScreenPanel != null)
-        {
             deathScreenPanel.SetActive(false);
-        }
         
-        // Unpause the game
         if (pauseGameOnDeath)
-        {
             Time.timeScale = 1f;
-        }
         
-        // Restart the scene
         RestartScene();
         
         isShowingDeathScreen = false;
+    }
+
+    private IEnumerator RunCountdown(float duration)
+    {
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            float remaining = duration - elapsed;
+            int displaySeconds = Mathf.FloorToInt(remaining);
+            respawnCountdownText.text = $"Respawning in {displaySeconds}";
+
+            elapsed += Time.unscaledDeltaTime;
+            yield return null;
+        }
+
+        respawnCountdownText.text = "Respawning in 0";
     }
     
     private IEnumerator FadeIn()
@@ -136,10 +139,7 @@ public class DeathScreenController : MonoBehaviour
     
     private void OnDestroy()
     {
-        // Make sure we unpause the game if this object is destroyed
         if (instance == this && pauseGameOnDeath)
-        {
             Time.timeScale = 1f;
-        }
     }
 }

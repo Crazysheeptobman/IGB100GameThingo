@@ -37,7 +37,6 @@ public class SettingsManager : MonoBehaviour
 
     public void BackToPreviousScene()
     {
-        // Save settings before leaving
         SaveSoundSettings();
         SaveResolutionSettings();
         SceneManager.LoadScene(previousSceneName);
@@ -148,8 +147,6 @@ public class SettingsManager : MonoBehaviour
         {
             fullscreenToggle.isOn = savedFullscreen == 1;
         }
-
-        // Apply loaded settings after dropdown options are populated
         OnResolutionChanged();
     }
 

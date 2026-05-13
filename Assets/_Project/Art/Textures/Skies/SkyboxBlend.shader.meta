@@ -1,0 +1,21 @@
+fileFormatVersion: 2
+guid: e66ca387142f241f6bf674e57a4eb668
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures:
+  - _FrontA: {instanceID: 0}
+  - _BackA: {instanceID: 0}
+  - _LeftA: {instanceID: 0}
+  - _RightA: {instanceID: 0}
+  - _UpA: {instanceID: 0}
+  - _DownA: {instanceID: 0}
+  - _FrontB: {instanceID: 0}
+  - _BackB: {instanceID: 0}
+  - _LeftB: {instanceID: 0}
+  - _RightB: {instanceID: 0}
+  - _UpB: {instanceID: 0}
+  - _DownB: {instanceID: 0}
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

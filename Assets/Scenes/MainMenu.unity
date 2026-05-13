@@ -1023,7 +1023,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SettingsManager
   settingsPanelRoot: {fileID: 667416529}
   masterVolumeSlider: {fileID: 1866491450}
-  resolutionDropdown: {fileID: 0}
+  resolutionDropdown: {fileID: 869093640}
   fullscreenToggle: {fileID: 1700543388}
 --- !u!4 &581197400
 Transform:
@@ -1075,7 +1075,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -430, y: 109}
+  m_AnchoredPosition: {x: -430, y: 142}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &585100835

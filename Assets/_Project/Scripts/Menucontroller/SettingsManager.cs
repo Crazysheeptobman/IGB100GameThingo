@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using TMPro;
 
 public class SettingsManager : MonoBehaviour
 {
@@ -11,7 +12,7 @@ public class SettingsManager : MonoBehaviour
     [SerializeField] private Slider masterVolumeSlider;
 
     [Header("Resolution Settings")]
-    [SerializeField] private Dropdown resolutionDropdown;
+    [SerializeField] private TMP_Dropdown resolutionDropdown;
     [SerializeField] private Toggle fullscreenToggle;
 
     private List<Resolution> availableResolutions = new List<Resolution>();

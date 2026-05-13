@@ -1,10 +1,12 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using System.Collections.Generic;
 
 public class SettingsManager : MonoBehaviour
 {
+    [Header("Panel")]
+    [SerializeField] private GameObject settingsPanelRoot;
+
     [Header("Sound Settings")]
     [SerializeField] private Slider masterVolumeSlider;
 
@@ -12,34 +14,44 @@ public class SettingsManager : MonoBehaviour
     [SerializeField] private Dropdown resolutionDropdown;
     [SerializeField] private Toggle fullscreenToggle;
 
-    private string previousSceneName;
     private List<Resolution> availableResolutions = new List<Resolution>();
+
+    private void Awake()
+    {
+        // Start hidden
+        if (settingsPanelRoot != null)
+            settingsPanelRoot.SetActive(false);
+    }
 
     private void Start()
     {
-        // Store the scene we came from
-        previousSceneName = PlayerPrefs.GetString("PreviousScene", "MainMenu");
-
         PopulateResolutionDropdown();
         LoadSoundSettings();
         LoadResolutionSettings();
 
         if (resolutionDropdown != null)
-        {
             resolutionDropdown.onValueChanged.AddListener(delegate { OnResolutionChanged(); });
-        }
 
         if (fullscreenToggle != null)
-        {
             fullscreenToggle.onValueChanged.AddListener(delegate { OnFullscreenChanged(); });
-        }
+
+        if (masterVolumeSlider != null)
+            masterVolumeSlider.onValueChanged.AddListener(delegate { OnMasterVolumeChanged(); });
     }
 
-    public void BackToPreviousScene()
+    public void OpenSettings()
+    {
+        if (settingsPanelRoot != null)
+            settingsPanelRoot.SetActive(true);
+    }
+
+    public void CloseSettings()
     {
         SaveSoundSettings();
         SaveResolutionSettings();
-        SceneManager.LoadScene(previousSceneName);
+
+        if (settingsPanelRoot != null)
+            settingsPanelRoot.SetActive(false);
     }
 
     public void OnMasterVolumeChanged()
@@ -47,6 +59,7 @@ public class SettingsManager : MonoBehaviour
         if (masterVolumeSlider != null)
         {
             AudioListener.volume = masterVolumeSlider.value;
+            PlayerPrefs.SetFloat("MasterVolume", masterVolumeSlider.value);
         }
     }
 
@@ -62,38 +75,54 @@ public class SettingsManager : MonoBehaviour
 
     public void OnFullscreenChanged()
     {
-        if (fullscreenToggle != null && resolutionDropdown != null && availableResolutions.Count > resolutionDropdown.value)
+        if (fullscreenToggle == null) return;
+
+        Screen.fullScreenMode = fullscreenToggle.isOn 
+            ? FullScreenMode.FullScreenWindow 
+            : FullScreenMode.Windowed;
+
+        if (resolutionDropdown != null &&
+            availableResolutions.Count > resolutionDropdown.value)
         {
-            bool fullscreen = fullscreenToggle.isOn;
             Resolution selectedResolution = availableResolutions[resolutionDropdown.value];
-            Screen.SetResolution(selectedResolution.width, selectedResolution.height, fullscreen);
+
+            Screen.SetResolution(
+                selectedResolution.width,
+                selectedResolution.height,
+                fullscreenToggle.isOn
+            );
         }
     }
 
-    private void PopulateResolutionDropdown()
+        private void PopulateResolutionDropdown()
     {
-        if (resolutionDropdown == null)
-        {
-            return;
-        }
+        if (resolutionDropdown == null) return;
 
         availableResolutions.Clear();
         resolutionDropdown.ClearOptions();
 
         Resolution[] resolutions = Screen.resolutions;
         List<string> options = new List<string>();
+        HashSet<string> addedResolutions = new HashSet<string>();
 
         int currentResolutionIndex = 0;
+
         for (int i = 0; i < resolutions.Length; i++)
         {
             Resolution res = resolutions[i];
             string option = res.width + " x " + res.height;
+
+            if (addedResolutions.Contains(option))
+                continue;
+
+            addedResolutions.Add(option);
             options.Add(option);
             availableResolutions.Add(res);
 
-            if (res.width == Screen.currentResolution.width && res.height == Screen.currentResolution.height)
+            if (res.width == Screen.currentResolution.width &&
+                res.height == Screen.currentResolution.height)
             {
-                currentResolutionIndex = i;
+                currentResolutionIndex = availableResolutions.Count - 1;
             }
         }
 
@@ -105,9 +134,7 @@ public class SettingsManager : MonoBehaviour
     private void SaveSoundSettings()
     {
         if (masterVolumeSlider != null)
-        {
             PlayerPrefs.SetFloat("MasterVolume", masterVolumeSlider.value);
-        }
         PlayerPrefs.Save();
     }
 
@@ -117,20 +144,16 @@ public class SettingsManager : MonoBehaviour
         if (masterVolumeSlider != null)
         {
             masterVolumeSlider.value = savedVolume;
-            AudioListener.volume = savedVolume;
         }
+        AudioListener.volume = savedVolume;
     }
 
     private void SaveResolutionSettings()
     {
         if (resolutionDropdown != null)
-        {
             PlayerPrefs.SetInt("ResolutionIndex", resolutionDropdown.value);
-        }
         if (fullscreenToggle != null)
-        {
             PlayerPrefs.SetInt("Fullscreen", fullscreenToggle.isOn ? 1 : 0);
-        }
         PlayerPrefs.Save();
     }
 
@@ -140,14 +163,12 @@ public class SettingsManager : MonoBehaviour
         int savedFullscreen = PlayerPrefs.GetInt("Fullscreen", Screen.fullScreen ? 1 : 0);
 
         if (resolutionDropdown != null)
-        {
-            resolutionDropdown.value = Mathf.Clamp(savedResolutionIndex, 0, availableResolutions.Count - 1);
-        }
+            resolutionDropdown.value = Mathf.Clamp(savedResolutionIndex,
+                0, availableResolutions.Count - 1);
         if (fullscreenToggle != null)
-        {
             fullscreenToggle.isOn = savedFullscreen == 1;
-        }
-        OnResolutionChanged();
+
+        OnFullscreenChanged();
     }
 
     private void OnDestroy()
@@ -155,4 +176,5 @@ public class SettingsManager : MonoBehaviour
         SaveSoundSettings();
         SaveResolutionSettings();
     }
+
 }

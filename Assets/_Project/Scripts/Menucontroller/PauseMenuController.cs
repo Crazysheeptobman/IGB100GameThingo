@@ -3,10 +3,12 @@ using UnityEngine.SceneManagement;
 
 public class PauseManager : MonoBehaviour
 {
+    [SerializeField] private SettingsManager settingsManager;
     public GameObject pauseMenuPanel;
     public DetachedFpsLook fpsLook;
 
     private bool isPaused = false;
+    
 
     void Start()
     {
@@ -40,6 +42,12 @@ public class PauseManager : MonoBehaviour
         Cursor.lockState = CursorLockMode.None;
     }
 
+       public void OpenSettings()
+    {
+        settingsManager.OpenSettings();
+    }
+
+
     public void ResumeGame()
     {
         pauseMenuPanel.SetActive(false);
@@ -68,12 +76,5 @@ public class PauseManager : MonoBehaviour
 #else
         Application.Quit();
 #endif
-    }
-
-    public void OpenSettings()
-    {
-        Time.timeScale = 1f;
-        PlayerPrefs.SetString("PreviousScene", SceneManager.GetActiveScene().name);
-        SceneManager.LoadScene("SettingPanel");
     }
 }

@@ -5,6 +5,7 @@ public class MainMenuController : MonoBehaviour
 {
     [SerializeField] private string gameSceneName = "GameScene";
     [SerializeField] private string NewSceneName = "TutorialScreen";
+    [SerializeField] private SettingsManager settingsManager;
 
     public void StartGame()
     {
@@ -14,12 +15,10 @@ public class MainMenuController : MonoBehaviour
     {
         SceneManager.LoadScene(NewSceneName);
     }
-    
 
     public void OpenSettings()
     {
-        PlayerPrefs.SetString("PreviousScene", SceneManager.GetActiveScene().name);
-        SceneManager.LoadScene("SettingPanel");
+        settingsManager.OpenSettings();
     }
 
     public void QuitGame()

@@ -139,15 +139,12 @@ public class SkyboxBlendController : MonoBehaviour
 
     private void CopySkyboxToSlot(Material skybox, string slot)
     {
-        string[] faces = { "Front", "Back", "Left", "Right", "Up", "Down" };
-        string[] props = { "_FrontTex", "_BackTex", "_LeftTex", "_RightTex", "_UpTex", "_DownTex" };
-
-        for (int i = 0; i < faces.Length; i++)
-        {
-            Texture tex = skybox.GetTexture(props[i]);
-            if (tex != null)
-                blendMaterial.SetTexture("_" + faces[i] + slot, tex);
-        }
+        blendMaterial.SetTexture("_FrontTex" + slot, skybox.GetTexture("_FrontTex"));
+        blendMaterial.SetTexture("_BackTex"  + slot, skybox.GetTexture("_BackTex"));
+        blendMaterial.SetTexture("_LeftTex"  + slot, skybox.GetTexture("_LeftTex"));
+        blendMaterial.SetTexture("_RightTex" + slot, skybox.GetTexture("_RightTex"));
+        blendMaterial.SetTexture("_UpTex"    + slot, skybox.GetTexture("_UpTex"));
+        blendMaterial.SetTexture("_DownTex"  + slot, skybox.GetTexture("_DownTex"));
     }
 
 

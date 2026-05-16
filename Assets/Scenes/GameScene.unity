@@ -5933,11 +5933,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WhooshLinesEffect
   playerMovement: {fileID: 916302469}
   whooshImage: {fileID: 1235707787}
-  minSpeed: 100
-  maxSpeed: 500
+  minSpeed: 80
+  maxSpeed: 200
   minAlpha: 0
-  maxAlpha: 0.083
+  maxAlpha: 0.053
   fadeSpeed: 10
+  enableDebugLogs: 1
+  debugLogInterval: 0.5
 --- !u!4 &1847516642
 Transform:
   m_ObjectHideFlags: 0

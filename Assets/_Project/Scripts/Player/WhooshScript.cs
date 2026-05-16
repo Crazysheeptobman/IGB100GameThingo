@@ -8,24 +8,22 @@ public class WhooshLinesEffect : MonoBehaviour
     [SerializeField] private Image whooshImage;
 
     [Header("Speed Thresholds")]
-    [Tooltip("Speed at which whoosh lines begin to appear.")]
     [SerializeField, Min(0f)] private float minSpeed = 12f;
-
-    [Tooltip("Speed at which whoosh lines reach maximum opacity.")]
     [SerializeField, Min(0f)] private float maxSpeed = 30f;
 
     [Header("Opacity")]
-    [Tooltip("Alpha when effect is at its weakest (just above minSpeed).")]
     [SerializeField, Range(0f, 1f)] private float minAlpha = 0f;
-
-    [Tooltip("Alpha when effect is at full intensity (at or above maxSpeed).")]
     [SerializeField, Range(0f, 1f)] private float maxAlpha = 0.75f;
 
     [Header("Smoothing")]
-    [Tooltip("How quickly the effect fades in and out. Higher = snappier.")]
     [SerializeField, Min(0.01f)] private float fadeSpeed = 6f;
 
+    [Header("Debug")]
+    [SerializeField] private bool enableDebugLogs = true;
+    [SerializeField, Min(0.1f)] private float debugLogInterval = 0.5f;
+
     private float currentAlpha;
+    private float debugLogTimer;
 
     private void Reset()
     {
@@ -35,21 +33,24 @@ public class WhooshLinesEffect : MonoBehaviour
 
     private void Awake()
     {
+        if (playerMovement == null)
+            Debug.LogWarning("WhooshLinesEffect: playerMovement is NULL!", this);
+
         if (whooshImage == null)
         {
-            Debug.LogWarning("WhooshLinesEffect: no Image assigned.", this);
+            Debug.LogError("WhooshLinesEffect: whooshImage is NULL, disabling script!", this);
             enabled = false;
             return;
         }
+        whooshImage.gameObject.SetActive(true);
         SetImageAlpha(0f);
+        currentAlpha = 0f;
     }
 
     private void Update()
     {
         if (playerMovement == null || whooshImage == null)
-        {
             return;
-        }
 
         float speed = playerMovement.CurrentVelocity.magnitude;
         float targetAlpha = CalculateTargetAlpha(speed);
@@ -58,18 +59,27 @@ public class WhooshLinesEffect : MonoBehaviour
         currentAlpha = Mathf.Lerp(currentAlpha, targetAlpha, blend);
 
         SetImageAlpha(currentAlpha);
+
+        if (enableDebugLogs)
+        {
+            debugLogTimer -= Time.deltaTime;
+            if (debugLogTimer <= 0f)
+            {
+                debugLogTimer = debugLogInterval;
+                Debug.Log($"WhooshLinesEffect: speed={speed:F2}, " +
+                          $"targetAlpha={targetAlpha:F3}, " +
+                          $"currentAlpha={currentAlpha:F3}");
+            }
+        }
     }
 
     private float CalculateTargetAlpha(float speed)
     {
         if (maxSpeed <= minSpeed)
-        {
             return speed >= minSpeed ? maxAlpha : minAlpha;
-        }
 
         float t = Mathf.InverseLerp(minSpeed, maxSpeed, speed);
-        float alpha = Mathf.Lerp(minAlpha, maxAlpha, t);
-        return alpha;
+        return Mathf.Lerp(minAlpha, maxAlpha, t);
     }
 
     private void SetImageAlpha(float alpha)

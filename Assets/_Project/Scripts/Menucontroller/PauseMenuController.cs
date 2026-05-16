@@ -27,7 +27,6 @@ public class PauseManager : MonoBehaviour
                 PauseGame();
         }
 
-        // Debug: on left click, log what UI element is under the cursor
         if (Input.GetMouseButtonDown(0) && isPaused)
         {
             PointerEventData pointerData = new PointerEventData(EventSystem.current)
@@ -37,29 +36,11 @@ public class PauseManager : MonoBehaviour
 
             List<RaycastResult> results = new List<RaycastResult>();
             EventSystem.current.RaycastAll(pointerData, results);
-
-            if (results.Count == 0)
-            {
-                Debug.Log("PauseManager DEBUG: Click detected but hit NOTHING — " +
-                          "no UI element found under cursor. Likely a canvas/EventSystem issue.");
-            }
-            else
-            {
-                Debug.Log($"PauseManager DEBUG: Click hit {results.Count} UI element(s):");
-                foreach (RaycastResult result in results)
-                {
-                    Debug.Log($"  → '{result.gameObject.name}' " +
-                              $"on Canvas sort order={result.sortingOrder}, " +
-                              $"depth={result.depth}, " +
-                              $"distance={result.distance:F2}");
-                }
-            }
         }
     }
 
     public void PauseGame()
     {
-        Debug.Log("PauseManager: PauseGame called");
         pauseMenuPanel.SetActive(true);
         Time.timeScale = 0f;
         isPaused = true;
@@ -73,13 +54,11 @@ public class PauseManager : MonoBehaviour
 
     public void OpenSettings()
     {
-        Debug.Log("PauseManager: OpenSettings called");
         settingsManager.OpenSettings();
     }
 
     public void ResumeGame()
     {
-        Debug.Log("PauseManager: ResumeGame called");
         pauseMenuPanel.SetActive(false);
         Time.timeScale = 1f;
         isPaused = false;
@@ -93,14 +72,12 @@ public class PauseManager : MonoBehaviour
 
     public void ReturnToMainMenu()
     {
-        Debug.Log("PauseManager: ReturnToMainMenu called");
         Time.timeScale = 1f;
         SceneManager.LoadScene("MainMenu");
     }
 
     public void QuitGame()
     {
-        Debug.Log("PauseManager: QuitGame called");
         Time.timeScale = 1f;
 
 #if UNITY_EDITOR

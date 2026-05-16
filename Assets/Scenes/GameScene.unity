@@ -5936,10 +5936,8 @@ MonoBehaviour:
   minSpeed: 80
   maxSpeed: 200
   minAlpha: 0
-  maxAlpha: 0.053
+  maxAlpha: 0.04
   fadeSpeed: 10
-  enableDebugLogs: 1
-  debugLogInterval: 0.5
 --- !u!4 &1847516642
 Transform:
   m_ObjectHideFlags: 0

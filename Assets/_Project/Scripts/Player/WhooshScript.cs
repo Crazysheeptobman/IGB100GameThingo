@@ -18,12 +18,7 @@ public class WhooshLinesEffect : MonoBehaviour
     [Header("Smoothing")]
     [SerializeField, Min(0.01f)] private float fadeSpeed = 6f;
 
-    [Header("Debug")]
-    [SerializeField] private bool enableDebugLogs = true;
-    [SerializeField, Min(0.1f)] private float debugLogInterval = 0.5f;
-
     private float currentAlpha;
-    private float debugLogTimer;
 
     private void Reset()
     {
@@ -59,18 +54,6 @@ public class WhooshLinesEffect : MonoBehaviour
         currentAlpha = Mathf.Lerp(currentAlpha, targetAlpha, blend);
 
         SetImageAlpha(currentAlpha);
-
-        if (enableDebugLogs)
-        {
-            debugLogTimer -= Time.deltaTime;
-            if (debugLogTimer <= 0f)
-            {
-                debugLogTimer = debugLogInterval;
-                Debug.Log($"WhooshLinesEffect: speed={speed:F2}, " +
-                          $"targetAlpha={targetAlpha:F3}, " +
-                          $"currentAlpha={currentAlpha:F3}");
-            }
-        }
     }
 
     private float CalculateTargetAlpha(float speed)

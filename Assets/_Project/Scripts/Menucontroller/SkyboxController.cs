@@ -36,14 +36,12 @@ public class SkyboxBlendController : MonoBehaviour
     {
         if (blendMaterial == null)
         {
-            Debug.LogError("SkyboxBlendController: no blend material assigned!", this);
             enabled = false;
             return;
         }
 
         if (skyboxes == null || skyboxes.Length < 2)
         {
-            Debug.LogError("SkyboxBlendController: need at least 2 skyboxes!", this);
             enabled = false;
             return;
         }

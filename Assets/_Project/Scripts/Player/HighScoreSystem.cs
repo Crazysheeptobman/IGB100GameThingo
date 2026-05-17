@@ -5,8 +5,8 @@ public class HighScoreSystem : MonoBehaviour
     [SerializeField] private Transform player;
     [SerializeField] private bool showScoreOnGui = true;
     [SerializeField] private Vector2 guiPosition = new Vector2(10f, 10f);
-    [SerializeField] private Vector2 guiSize = new Vector2(210f, 55f);
-    [SerializeField] private int fontSize = 40; 
+    [SerializeField] private Vector2 guiSize = new Vector2(945f, 247.5f);
+    [SerializeField] private int fontSize = 180; 
 
     private float startZ, highestZ, elapsedTime;
     private int bonusScore;

@@ -66,12 +66,15 @@ public class SettingsManager : MonoBehaviour
 
     public void OnResolutionChanged()
     {
-        if (resolutionDropdown != null && availableResolutions.Count > resolutionDropdown.value)
-        {
-            Resolution selectedResolution = availableResolutions[resolutionDropdown.value];
-            bool fullscreen = fullscreenToggle != null ? fullscreenToggle.isOn : Screen.fullScreen;
-            Screen.SetResolution(selectedResolution.width, selectedResolution.height, fullscreen);
-        }
+        if (resolutionDropdown == null || availableResolutions.Count <= resolutionDropdown.value)
+            return;
+
+        Resolution selectedResolution = availableResolutions[resolutionDropdown.value];
+        bool fullscreen = fullscreenToggle != null ? fullscreenToggle.isOn : Screen.fullScreen;
+        Screen.fullScreenMode = fullscreen
+            ? FullScreenMode.FullScreenWindow
+            : FullScreenMode.Windowed;
+        Screen.SetResolution(selectedResolution.width, selectedResolution.height, fullscreen);
     }
 
     public void OnFullscreenChanged()
@@ -82,17 +85,16 @@ public class SettingsManager : MonoBehaviour
             ? FullScreenMode.FullScreenWindow 
             : FullScreenMode.Windowed;
 
-        if (resolutionDropdown != null &&
-            availableResolutions.Count > resolutionDropdown.value)
-        {
-            Resolution selectedResolution = availableResolutions[resolutionDropdown.value];
+        if (resolutionDropdown == null || availableResolutions.Count <= resolutionDropdown.value)
+            return;
 
-            Screen.SetResolution(
-                selectedResolution.width,
-                selectedResolution.height,
-                fullscreenToggle.isOn
-            );
-        }
+        Resolution selectedResolution = availableResolutions[resolutionDropdown.value];
+
+        Screen.SetResolution(
+            selectedResolution.width,
+            selectedResolution.height,
+            fullscreenToggle.isOn
+        );
     }
 
     private void PopulateResolutionDropdown()
@@ -102,22 +104,14 @@ public class SettingsManager : MonoBehaviour
         availableResolutions.Clear();
         resolutionDropdown.ClearOptions();
 
-        List<(int width, int height)> targetResolutions = new List<(int, int)>
-        {
-            (2880, 1800), 
-            (2560, 1440), 
-            (1920, 1080),
-            (1280, 720), 
-        };
-
+        Resolution[] unityResolutions = Screen.resolutions;
         List<string> options = new List<string>();
         int currentResolutionIndex = 0;
 
-        foreach (var target in targetResolutions)
+        foreach (Resolution res in unityResolutions)
         {
-            Resolution res = new Resolution();
-            res.width  = target.width;
-            res.height = target.height;
+            if (availableResolutions.Exists(r => r.width == res.width && r.height == res.height))
+                continue;
 
             availableResolutions.Add(res);
             options.Add(res.width + " x " + res.height);
@@ -129,8 +123,15 @@ public class SettingsManager : MonoBehaviour
             }
         }
 
+        if (options.Count == 0)
+        {
+            Resolution current = Screen.currentResolution;
+            availableResolutions.Add(current);
+            options.Add(current.width + " x " + current.height);
+        }
+
         resolutionDropdown.AddOptions(options);
-        resolutionDropdown.value = currentResolutionIndex;
+        resolutionDropdown.value = Mathf.Clamp(currentResolutionIndex, 0, options.Count - 1);
         resolutionDropdown.RefreshShownValue();
     }
 

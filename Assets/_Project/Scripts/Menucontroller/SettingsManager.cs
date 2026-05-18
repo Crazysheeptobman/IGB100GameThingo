@@ -10,14 +10,12 @@ public class SettingsManager : MonoBehaviour
 
     [Header("Sound Settings")]
     [SerializeField] private Slider masterVolumeSlider;
-    [SerializeField] private Slider sfxVolumeSlider;
 
     [Header("Resolution Settings")]
     [SerializeField] private TMP_Dropdown resolutionDropdown;
     [SerializeField] private Toggle fullscreenToggle;
 
     private List<Resolution> availableResolutions = new List<Resolution>();
-    private const string SfxVolumePrefKey = "SfxVolume";
 
     private void Awake()
     {
@@ -40,9 +38,6 @@ public class SettingsManager : MonoBehaviour
 
         if (masterVolumeSlider != null)
             masterVolumeSlider.onValueChanged.AddListener(delegate { OnMasterVolumeChanged(); });
-
-        if (sfxVolumeSlider != null)
-            sfxVolumeSlider.onValueChanged.AddListener(delegate { OnSfxVolumeChanged(); });
     }
 
     public void OpenSettings()
@@ -66,14 +61,6 @@ public class SettingsManager : MonoBehaviour
         {
             AudioListener.volume = masterVolumeSlider.value;
             PlayerPrefs.SetFloat("MasterVolume", masterVolumeSlider.value);
-        }
-    }
-
-    public void OnSfxVolumeChanged()
-    {
-        if (sfxVolumeSlider != null)
-        {
-            PlayerPrefs.SetFloat(SfxVolumePrefKey, sfxVolumeSlider.value);
         }
     }
 
@@ -152,10 +139,6 @@ public class SettingsManager : MonoBehaviour
     {
         if (masterVolumeSlider != null)
             PlayerPrefs.SetFloat("MasterVolume", masterVolumeSlider.value);
-
-        if (sfxVolumeSlider != null)
-            PlayerPrefs.SetFloat(SfxVolumePrefKey, sfxVolumeSlider.value);
-
         PlayerPrefs.Save();
     }
 
@@ -165,10 +148,6 @@ public class SettingsManager : MonoBehaviour
         if (masterVolumeSlider != null)
             masterVolumeSlider.value = savedVolume;
         AudioListener.volume = savedVolume;
-
-        float savedSfxVolume = PlayerPrefs.GetFloat(SfxVolumePrefKey, 1f);
-        if (sfxVolumeSlider != null)
-            sfxVolumeSlider.value = savedSfxVolume;
     }
 
     private void SaveResolutionSettings()

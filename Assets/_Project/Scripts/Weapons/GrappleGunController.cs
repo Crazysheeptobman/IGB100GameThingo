@@ -1414,11 +1414,6 @@ public class GrappleGunController : MonoBehaviour
         source.pitch = 1f;
     }
 
-    private static float GetSfxVolumeMultiplier()
-    {
-        return PlayerPrefs.GetFloat("SfxVolume", 1f);
-    }
-
     private void PlayDeploySfx()
     {
         if (grappleDeployClip == null)
@@ -1427,7 +1422,7 @@ public class GrappleGunController : MonoBehaviour
         }
 
         EnsureAudioSources();
-        grappleDeploySource.PlayOneShot(grappleDeployClip, grappleDeployVolume * GetSfxVolumeMultiplier());
+        grappleDeploySource.PlayOneShot(grappleDeployClip, grappleDeployVolume);
     }
 
     private void PlayReturnSfx(float targetDuration)
@@ -1456,7 +1451,7 @@ public class GrappleGunController : MonoBehaviour
         }
 
         grappleReturnSource.clip = clipToPlay;
-        grappleReturnSource.volume = grappleReturnVolume * GetSfxVolumeMultiplier();
+        grappleReturnSource.volume = grappleReturnVolume;
         grappleReturnSource.pitch = 1f;
         grappleReturnSource.Play();
     }

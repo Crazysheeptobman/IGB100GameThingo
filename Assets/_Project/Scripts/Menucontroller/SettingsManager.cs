@@ -36,7 +36,6 @@ public class SettingsManager : MonoBehaviour
         LoadMouseSettings();
         LoadDisplayUISettings();
 
-        // Listeners
         if (masterVolumeSlider != null)
             masterVolumeSlider.onValueChanged.AddListener(delegate { OnMasterVolumeChanged(); });
 
@@ -54,10 +53,6 @@ public class SettingsManager : MonoBehaviour
             fullscreenToggle.onValueChanged.AddListener(delegate { OnFullscreenChanged(); });
     }
 
-    // -------------------------
-    // Panel
-    // -------------------------
-
     public void OpenSettings()
     {
         if (settingsPanelRoot != null)
@@ -69,10 +64,6 @@ public class SettingsManager : MonoBehaviour
         if (settingsPanelRoot != null)
             settingsPanelRoot.SetActive(false);
     }
-
-    // -------------------------
-    // Volume
-    // -------------------------
 
     public void OnMasterVolumeChanged()
     {
@@ -93,10 +84,6 @@ public class SettingsManager : MonoBehaviour
         AudioListener.volume = savedVolume;
     }
 
-    // -------------------------
-    // Mouse Sensitivity
-    // -------------------------
-
     public void OnMouseSensitivityChanged()
     {
         if (mouseSensitivitySlider == null) return;
@@ -116,10 +103,6 @@ public class SettingsManager : MonoBehaviour
         if (mouseSensitivitySlider != null)
             mouseSensitivitySlider.value = savedSensitivity;
     }
-
-    // -------------------------
-    // Resolution / Fullscreen
-    // -------------------------
 
     private void PopulateResolutionDropdown()
     {
@@ -156,11 +139,9 @@ public class SettingsManager : MonoBehaviour
 
     private void LoadDisplayUISettings()
     {
-        // ONLY updates UI values
-        // Does NOT force screen changes on scene load
 
-        int savedIndex = PlayerPrefs.GetInt("ResolutionIndex", 2); // default = 1920x1080
-        int savedFullscreen = PlayerPrefs.GetInt("Fullscreen", 1); // default = fullscreen
+        int savedIndex = PlayerPrefs.GetInt("ResolutionIndex", 2); 
+        int savedFullscreen = PlayerPrefs.GetInt("Fullscreen", 1); 
 
         if (resolutionDropdown != null)
         {

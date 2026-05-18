@@ -2,24 +2,34 @@
 
 public class HighScoreSystem : MonoBehaviour
 {
+    [Header("References")]
     [SerializeField] private Transform player;
+
+    [Header("UI")]
     [SerializeField] private bool showScoreOnGui = true;
-    [SerializeField] private Vector2 guiPosition = new Vector2(10f, 10f);
-    [SerializeField] private Vector2 guiSize = new Vector2(260f, 80f);
-    [SerializeField] private int fontSize = 40;
+
+
+    [SerializeField] private Vector2 baseGuiPosition = new Vector2(20f, 20f);
+    [SerializeField] private Vector2 baseGuiSize = new Vector2(420f, 180f);
+    [SerializeField] private int baseFontSize = 40;
+
+    private const float REFERENCE_WIDTH = 1920f;
+    private const float REFERENCE_HEIGHT = 1080f;
 
     private float startZ;
     private float highestZ;
     private float elapsedTime;
+
     private int bonusScore;
     private int coins;
+    private static int bestScoreThisSession = 0;
 
     public float HighestZ => highestZ;
     public int Coins => coins;
+    public static int BestScoreThisSession => bestScoreThisSession;
 
     public int Score =>
-        Mathf.Max(0, Mathf.FloorToInt(highestZ - startZ))
-        + bonusScore;
+        Mathf.Max(0, Mathf.FloorToInt(highestZ - startZ)) + bonusScore;
 
     private void Awake()
     {
@@ -31,7 +41,8 @@ public class HighScoreSystem : MonoBehaviour
 
     private void Update()
     {
-        if (player == null) return;
+        if (player == null)
+            return;
 
         elapsedTime += Time.deltaTime;
 
@@ -43,20 +54,31 @@ public class HighScoreSystem : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!showScoreOnGui) return;
+        if (!showScoreOnGui)
+            return;
+
+        float widthScale = Screen.width / REFERENCE_WIDTH;
+        float heightScale = Screen.height / REFERENCE_HEIGHT;
+
+        float scale = Mathf.Min(widthScale, heightScale);
+
+        Rect scaledRect = new Rect(
+            baseGuiPosition.x * widthScale,
+            baseGuiPosition.y * heightScale,
+            baseGuiSize.x * widthScale,
+            baseGuiSize.y * heightScale
+        );
 
         GUIStyle style = new GUIStyle(GUI.skin.box);
-        style.fontSize = fontSize;
+        style.fontSize = Mathf.RoundToInt(baseFontSize * scale);
         style.alignment = TextAnchor.UpperLeft;
 
         GUI.Box(
-            new Rect(
-                guiPosition.x,
-                guiPosition.y,
-                guiSize.x,
-                guiSize.y
-            ),
-            $"Score: {Score}\nCoins: {coins}\nTime: {FormatTime(elapsedTime)}",
+            scaledRect,
+            $"Score: {Score}\n" +
+            $"Best Score: {bestScoreThisSession}\n" +
+            $"Coins: {coins}\n" +
+            $"Time: {FormatTime(elapsedTime)}",
             style
         );
     }
@@ -72,7 +94,8 @@ public class HighScoreSystem : MonoBehaviour
 
     public void ResetScore()
     {
-        if (player == null) return;
+        if (player == null)
+            return;
 
         startZ = highestZ = player.position.z;
         elapsedTime = 0f;
@@ -88,5 +111,16 @@ public class HighScoreSystem : MonoBehaviour
     public void AddCoin(int amount)
     {
         coins += Mathf.Max(0, amount);
+    }
+
+    public bool TrySetNewBestScore()
+    {
+        if (Score > bestScoreThisSession)
+        {
+            bestScoreThisSession = Score;
+            return true;
+        }
+
+        return false;
     }
 }

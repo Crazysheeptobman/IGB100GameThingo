@@ -150,7 +150,6 @@ public class ParkourPlayerMovement : MonoBehaviour
             return;
         }
 
-        // Check for death (falling below death level) - shows death screen
         if (transform.position.y < deathYLevel)
         {
             TriggerDeath();

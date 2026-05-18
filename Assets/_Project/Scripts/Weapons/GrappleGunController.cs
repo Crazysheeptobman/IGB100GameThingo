@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -41,6 +42,9 @@ public class GrappleGunController : MonoBehaviour
 
     [Header("Input")]
     [SerializeField] private bool holdToMaintainGrapple = true;
+    [SerializeField] private bool ignoreInputWhileGameplayBlocked = true;
+    [SerializeField] private bool ignoreInputWhileTimeStopped = true;
+    [SerializeField] private bool ignoreInputOverUi = true;
     [SerializeField, Min(0f), Tooltip("Seconds a held mouse button keeps trying to start a swing after the first press misses.")]
     private float heldStartRetryDuration = 1f;
 
@@ -90,6 +94,7 @@ public class GrappleGunController : MonoBehaviour
     private GrappleMode pendingGrappleMode = GrappleMode.None;
     private float swingStartRetryTimer;
     private bool wasSwingHeldLastFrame;
+    private bool waitingForInputRelease;
 
     private HookVisualState hookVisualState = HookVisualState.Idle;
     private Vector3 hookHomeLocalPosition;
@@ -231,6 +236,7 @@ public class GrappleGunController : MonoBehaviour
         StopReturnSfx();
         swingStartRetryTimer = 0f;
         wasSwingHeldLastFrame = false;
+        waitingForInputRelease = false;
     }
 
     private void OnDestroy()
@@ -256,6 +262,13 @@ public class GrappleGunController : MonoBehaviour
 
         isPrimaryController = true;
 
+        if (ShouldIgnoreGrappleInput())
+        {
+            ResetGrappleInputState();
+            waitingForInputRelease = true;
+            return;
+        }
+
         ReadGrappleInput(
             out bool leftPressed,
             out bool leftHeld,
@@ -263,6 +276,17 @@ public class GrappleGunController : MonoBehaviour
             out bool rightPressed,
             out bool rightHeld,
             out _);
+
+        if (waitingForInputRelease)
+        {
+            if (leftHeld || rightHeld)
+            {
+                ResetGrappleInputState();
+                return;
+            }
+
+            waitingForInputRelease = false;
+        }
 
         bool swingHeld = leftHeld || rightHeld;
         bool swingPressed = leftPressed || rightPressed || (swingHeld && !wasSwingHeldLastFrame);
@@ -337,6 +361,47 @@ public class GrappleGunController : MonoBehaviour
     private bool ShouldAttemptSwingStart(bool swingPressed, bool swingHeld)
     {
         return swingPressed || (swingHeld && swingStartRetryTimer > 0f);
+    }
+
+    private bool ShouldIgnoreGrappleInput()
+    {
+        if (ignoreInputWhileGameplayBlocked && PauseManager.IsGameplayInputBlocked)
+            return true;
+
+        if (ignoreInputWhileTimeStopped && Time.timeScale <= 0f)
+            return true;
+
+        return ignoreInputOverUi && IsPointerOverUi();
+    }
+
+    private void ResetGrappleInputState()
+    {
+        swingStartRetryTimer = 0f;
+        wasSwingHeldLastFrame = false;
+    }
+
+    private static bool IsPointerOverUi()
+    {
+        if (EventSystem.current == null)
+            return false;
+
+        if (EventSystem.current.IsPointerOverGameObject())
+            return true;
+
+#if ENABLE_INPUT_SYSTEM
+        if (Mouse.current != null && EventSystem.current.IsPointerOverGameObject(Mouse.current.deviceId))
+            return true;
+#endif
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+        for (int i = 0; i < Input.touchCount; i++)
+        {
+            if (EventSystem.current.IsPointerOverGameObject(Input.GetTouch(i).fingerId))
+                return true;
+        }
+#endif
+
+        return false;
     }
 
     private void FixedUpdate()

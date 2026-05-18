@@ -1,20 +1,25 @@
-﻿using UnityEngine;
+﻿using TMPro;
+using UnityEngine;
 
 public class HighScoreSystem : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private Transform player;
 
-    [Header("UI")]
-    [SerializeField] private bool showScoreOnGui = true;
+    [Header("UI Text")]
+    [SerializeField] private TMP_Text scoreText;
+    [SerializeField] private TMP_Text bestScoreText;
+    [SerializeField] private TMP_Text coinsText;
+    [SerializeField] private TMP_Text timeText;
+    [SerializeField] private TMP_Text combinedStatsText;
 
-
-    [SerializeField] private Vector2 baseGuiPosition = new Vector2(20f, 20f);
-    [SerializeField] private Vector2 baseGuiSize = new Vector2(420f, 180f);
-    [SerializeField] private int baseFontSize = 40;
-
-    private const float REFERENCE_WIDTH = 1920f;
-    private const float REFERENCE_HEIGHT = 1080f;
+    [Header("UI Formats")]
+    [SerializeField] private string scoreFormat = "Score: {0}";
+    [SerializeField] private string bestScoreFormat = "Best Score: {0}";
+    [SerializeField] private string coinsFormat = "Coins: {0}";
+    [SerializeField] private string timeFormat = "Time: {0}";
+    [SerializeField] private string combinedStatsFormat =
+        "Score: {0}\nBest Score: {1}\nCoins: {2}\nTime: {3}";
 
     private float startZ;
     private float highestZ;
@@ -37,6 +42,7 @@ public class HighScoreSystem : MonoBehaviour
             player = transform;
 
         startZ = highestZ = player.position.z;
+        RefreshUi();
     }
 
     private void Update()
@@ -50,37 +56,8 @@ public class HighScoreSystem : MonoBehaviour
 
         if (z > highestZ)
             highestZ = z;
-    }
 
-    private void OnGUI()
-    {
-        if (!showScoreOnGui)
-            return;
-
-        float widthScale = Screen.width / REFERENCE_WIDTH;
-        float heightScale = Screen.height / REFERENCE_HEIGHT;
-
-        float scale = Mathf.Min(widthScale, heightScale);
-
-        Rect scaledRect = new Rect(
-            baseGuiPosition.x * widthScale,
-            baseGuiPosition.y * heightScale,
-            baseGuiSize.x * widthScale,
-            baseGuiSize.y * heightScale
-        );
-
-        GUIStyle style = new GUIStyle(GUI.skin.box);
-        style.fontSize = Mathf.RoundToInt(baseFontSize * scale);
-        style.alignment = TextAnchor.UpperLeft;
-
-        GUI.Box(
-            scaledRect,
-            $"Score: {Score}\n" +
-            $"Best Score: {bestScoreThisSession}\n" +
-            $"Coins: {coins}\n" +
-            $"Time: {FormatTime(elapsedTime)}",
-            style
-        );
+        RefreshUi();
     }
 
     private static string FormatTime(float seconds)
@@ -92,6 +69,35 @@ public class HighScoreSystem : MonoBehaviour
         return $"{m:00}:{s:00}.{ms:00}";
     }
 
+    private void RefreshUi()
+    {
+        string formattedTime = FormatTime(elapsedTime);
+
+        SetText(scoreText, scoreFormat, Score);
+        SetText(bestScoreText, bestScoreFormat, bestScoreThisSession);
+        SetText(coinsText, coinsFormat, coins);
+        SetText(timeText, timeFormat, formattedTime);
+
+        if (combinedStatsText != null)
+        {
+            combinedStatsText.text = string.Format(
+                combinedStatsFormat,
+                Score,
+                bestScoreThisSession,
+                coins,
+                formattedTime
+            );
+        }
+    }
+
+    private static void SetText(TMP_Text text, string format, object value)
+    {
+        if (text == null)
+            return;
+
+        text.text = string.Format(format, value);
+    }
+
     public void ResetScore()
     {
         if (player == null)
@@ -101,16 +107,34 @@ public class HighScoreSystem : MonoBehaviour
         elapsedTime = 0f;
         bonusScore = 0;
         coins = 0;
+        RefreshUi();
     }
 
     public void AddPoints(int points)
     {
         bonusScore += Mathf.Max(0, points);
+        RefreshUi();
     }
 
     public void AddCoin(int amount)
     {
         coins += Mathf.Max(0, amount);
+        RefreshUi();
+    }
+
+    public void SetUiVisible(bool visible)
+    {
+        SetTextVisible(scoreText, visible);
+        SetTextVisible(bestScoreText, visible);
+        SetTextVisible(coinsText, visible);
+        SetTextVisible(timeText, visible);
+        SetTextVisible(combinedStatsText, visible);
+    }
+
+    private static void SetTextVisible(TMP_Text text, bool visible)
+    {
+        if (text != null)
+            text.gameObject.SetActive(visible);
     }
 
     public bool TrySetNewBestScore()
@@ -118,6 +142,7 @@ public class HighScoreSystem : MonoBehaviour
         if (Score > bestScoreThisSession)
         {
             bestScoreThisSession = Score;
+            RefreshUi();
             return true;
         }
 

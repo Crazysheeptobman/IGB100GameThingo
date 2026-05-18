@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System;
 using System.Collections.Generic;
 using TMPro;
 
@@ -19,13 +20,16 @@ public class SettingsManager : MonoBehaviour
     [SerializeField] private Toggle fullscreenToggle;
 
     public static float MouseSensitivity { get; private set; } = 0.5f;
+    public bool IsOpen { get; private set; }
+
+    public event Action SettingsOpened;
+    public event Action SettingsClosed;
 
     private List<Resolution> availableResolutions = new List<Resolution>();
 
     private void Awake()
     {
-        if (settingsPanelRoot != null)
-            settingsPanelRoot.SetActive(false);
+        SetSettingsVisible(false, notify: false);
     }
 
     private void Start()
@@ -55,14 +59,31 @@ public class SettingsManager : MonoBehaviour
 
     public void OpenSettings()
     {
-        if (settingsPanelRoot != null)
-            settingsPanelRoot.SetActive(true);
+        SetSettingsVisible(true, notify: true);
     }
 
     public void CloseSettings()
     {
+        SetSettingsVisible(false, notify: true);
+    }
+
+    private void SetSettingsVisible(bool visible, bool notify)
+    {
         if (settingsPanelRoot != null)
-            settingsPanelRoot.SetActive(false);
+            settingsPanelRoot.SetActive(visible);
+
+        if (IsOpen == visible)
+            return;
+
+        IsOpen = visible;
+
+        if (!notify)
+            return;
+
+        if (visible)
+            SettingsOpened?.Invoke();
+        else
+            SettingsClosed?.Invoke();
     }
 
     public void OnMasterVolumeChanged()

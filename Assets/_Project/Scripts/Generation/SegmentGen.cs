@@ -58,6 +58,12 @@ public class SegmentGen : MonoBehaviour
     [SerializeField, Min(0f), Tooltip("Shrinks the chosen segment BoxCollider volume inward before picking a random collectable position.")]
     private float collectableSpawnPadding;
 
+    [Header("Coins")]
+    [SerializeField] private bool spawnCoins = true;
+    [SerializeField] private GameObject coinPrefab;
+    [SerializeField] private int minCoinsPerSegment = 2;
+    [SerializeField] private int maxCoinsPerSegment = 6;
+
     [Header("Performance")]
     [SerializeField] private bool usePooling = true;
     [SerializeField, Min(0)] private int poolPrewarmPerPrefab = 1;
@@ -353,7 +359,10 @@ public class SegmentGen : MonoBehaviour
         };
 
         activeSegments.Add(activeSegment);
+
         SpawnCollectableForSegment(instance);
+        SpawnCoinsForSegment(instance);
+
         nextSpawnDistance += tileSize;
     }
 
@@ -573,6 +582,41 @@ public class SegmentGen : MonoBehaviour
         Vector3 spawnPosition = GetRandomPointInsideBox(spawnBounds);
         Quaternion spawnRotation = segmentInstance.transform.rotation * collectablePrefab.transform.rotation;
         Instantiate(collectablePrefab, spawnPosition, spawnRotation, collectableRoot);
+    }
+
+    private void SpawnCoinsForSegment(GameObject segmentInstance)
+    {
+        if (!spawnCoins || coinPrefab == null || segmentInstance == null)
+        {
+            return;
+        }
+
+        Transform collectableRoot = GetOrCreateCollectableRoot(segmentInstance.transform);
+
+        BoxCollider spawnBounds = FindSegmentSpawnBounds(segmentInstance, collectableRoot);
+
+        if (spawnBounds == null)
+        {
+            Debug.LogWarning($"No valid spawn bounds found for coins on {segmentInstance.name}");
+            return;
+        }
+
+        int coinCount = UnityEngine.Random.Range(
+            minCoinsPerSegment,
+            maxCoinsPerSegment + 1
+        );
+
+        for (int i = 0; i < coinCount; i++)
+        {
+            Vector3 spawnPosition = GetRandomPointInsideBox(spawnBounds);
+
+            Instantiate(
+                coinPrefab,
+                spawnPosition,
+                Quaternion.identity,
+                collectableRoot
+            );
+        }
     }
 
     private bool ShouldSpawnCollectable()

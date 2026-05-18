@@ -12,7 +12,6 @@ public class DetachedFpsLook : MonoBehaviour
     [SerializeField] private Transform cameraFollowTarget;
 
     [Header("Look")]
-    [SerializeField, Min(0f)] private float mouseSensitivity = 0.12f;
     [SerializeField, Min(0f)] private float gamepadSensitivity = 180f;
     [SerializeField] private bool invertY;
     [SerializeField, Range(-89f, 0f)] private float minPitch = -80f;
@@ -169,30 +168,39 @@ public class DetachedFpsLook : MonoBehaviour
     }
 
     private Vector2 ReadLookInputDegrees()
-    {
-        Vector2 look = Vector2.zero;
+{
+    Vector2 look = Vector2.zero;
+
+    float actualMouseSensitivity = Mathf.Lerp(
+        0.03f,
+        0.30f,
+        SettingsManager.MouseSensitivity
+    );
 
 #if ENABLE_INPUT_SYSTEM
-        if (Mouse.current != null)
-        {
-            look += Mouse.current.delta.ReadValue() * mouseSensitivity;
-        }
+    if (Mouse.current != null)
+    {
+        look += Mouse.current.delta.ReadValue() * actualMouseSensitivity;
+    }
 
-        if (Gamepad.current != null)
-        {
-            look += Gamepad.current.rightStick.ReadValue() * (gamepadSensitivity * Time.deltaTime);
-        }
+    if (Gamepad.current != null)
+    {
+        look += Gamepad.current.rightStick.ReadValue() * (gamepadSensitivity * Time.deltaTime);
+    }
 #endif
 
 #if ENABLE_LEGACY_INPUT_MANAGER
-        if (look == Vector2.zero)
-        {
-            look += new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y")) * mouseSensitivity;
-        }
+    if (look == Vector2.zero)
+    {
+        look += new Vector2(
+            Input.GetAxisRaw("Mouse X"),
+            Input.GetAxisRaw("Mouse Y")
+        ) * actualMouseSensitivity;
+    }
 #endif
 
-        return look;
-    }
+    return look;
+}
 
     private void ApplyCursorState()
     {

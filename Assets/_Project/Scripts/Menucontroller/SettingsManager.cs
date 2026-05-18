@@ -11,15 +11,19 @@ public class SettingsManager : MonoBehaviour
     [Header("Sound Settings")]
     [SerializeField] private Slider masterVolumeSlider;
 
-    [Header("Resolution Settings")]
+    [Header("Mouse Settings")]
+    [SerializeField] private Slider mouseSensitivitySlider;
+
+    [Header("Display Settings")]
     [SerializeField] private TMP_Dropdown resolutionDropdown;
     [SerializeField] private Toggle fullscreenToggle;
+
+    public static float MouseSensitivity { get; private set; } = 0.5f;
 
     private List<Resolution> availableResolutions = new List<Resolution>();
 
     private void Awake()
     {
-        // Start hidden
         if (settingsPanelRoot != null)
             settingsPanelRoot.SetActive(false);
     }
@@ -27,18 +31,32 @@ public class SettingsManager : MonoBehaviour
     private void Start()
     {
         PopulateResolutionDropdown();
+
         LoadSoundSettings();
-        LoadResolutionSettings();
+        LoadMouseSettings();
+        LoadDisplayUISettings();
+
+        // Listeners
+        if (masterVolumeSlider != null)
+            masterVolumeSlider.onValueChanged.AddListener(delegate { OnMasterVolumeChanged(); });
+
+        if (mouseSensitivitySlider != null)
+        {
+            mouseSensitivitySlider.minValue = 0f;
+            mouseSensitivitySlider.maxValue = 1f;
+            mouseSensitivitySlider.onValueChanged.AddListener(delegate { OnMouseSensitivityChanged(); });
+        }
 
         if (resolutionDropdown != null)
             resolutionDropdown.onValueChanged.AddListener(delegate { OnResolutionChanged(); });
 
         if (fullscreenToggle != null)
             fullscreenToggle.onValueChanged.AddListener(delegate { OnFullscreenChanged(); });
-
-        if (masterVolumeSlider != null)
-            masterVolumeSlider.onValueChanged.AddListener(delegate { OnMasterVolumeChanged(); });
     }
+
+    // -------------------------
+    // Panel
+    // -------------------------
 
     public void OpenSettings()
     {
@@ -48,52 +66,60 @@ public class SettingsManager : MonoBehaviour
 
     public void CloseSettings()
     {
-        SaveSoundSettings();
-        SaveResolutionSettings();
-
         if (settingsPanelRoot != null)
             settingsPanelRoot.SetActive(false);
     }
 
+    // -------------------------
+    // Volume
+    // -------------------------
+
     public void OnMasterVolumeChanged()
     {
+        if (masterVolumeSlider == null) return;
+
+        AudioListener.volume = masterVolumeSlider.value;
+        PlayerPrefs.SetFloat("MasterVolume", masterVolumeSlider.value);
+        PlayerPrefs.Save();
+    }
+
+    private void LoadSoundSettings()
+    {
+        float savedVolume = PlayerPrefs.GetFloat("MasterVolume", 0.5f);
+
         if (masterVolumeSlider != null)
-        {
-            AudioListener.volume = masterVolumeSlider.value;
-            PlayerPrefs.SetFloat("MasterVolume", masterVolumeSlider.value);
-        }
+            masterVolumeSlider.value = savedVolume;
+
+        AudioListener.volume = savedVolume;
     }
 
-    public void OnResolutionChanged()
+    // -------------------------
+    // Mouse Sensitivity
+    // -------------------------
+
+    public void OnMouseSensitivityChanged()
     {
-        if (resolutionDropdown != null && availableResolutions.Count > resolutionDropdown.value)
-        {
-            Resolution selectedResolution = availableResolutions[resolutionDropdown.value];
-            bool fullscreen = fullscreenToggle != null ? fullscreenToggle.isOn : Screen.fullScreen;
-            Screen.SetResolution(selectedResolution.width, selectedResolution.height, fullscreen);
-        }
+        if (mouseSensitivitySlider == null) return;
+
+        MouseSensitivity = mouseSensitivitySlider.value;
+
+        PlayerPrefs.SetFloat("MouseSensitivity", MouseSensitivity);
+        PlayerPrefs.Save();
     }
 
-    public void OnFullscreenChanged()
+    private void LoadMouseSettings()
     {
-        if (fullscreenToggle == null) return;
+        float savedSensitivity = PlayerPrefs.GetFloat("MouseSensitivity", 0.5f);
 
-        Screen.fullScreenMode = fullscreenToggle.isOn 
-            ? FullScreenMode.FullScreenWindow 
-            : FullScreenMode.Windowed;
+        MouseSensitivity = savedSensitivity;
 
-        if (resolutionDropdown != null &&
-            availableResolutions.Count > resolutionDropdown.value)
-        {
-            Resolution selectedResolution = availableResolutions[resolutionDropdown.value];
-
-            Screen.SetResolution(
-                selectedResolution.width,
-                selectedResolution.height,
-                fullscreenToggle.isOn
-            );
-        }
+        if (mouseSensitivitySlider != null)
+            mouseSensitivitySlider.value = savedSensitivity;
     }
+
+    // -------------------------
+    // Resolution / Fullscreen
+    // -------------------------
 
     private void PopulateResolutionDropdown()
     {
@@ -104,93 +130,87 @@ public class SettingsManager : MonoBehaviour
 
         List<(int width, int height)> targetResolutions = new List<(int, int)>
         {
-            (2880, 1800), 
-            (2560, 1440), 
+            (2880, 1800),
+            (2560, 1440),
             (1920, 1080),
-            (1280, 720), 
+            (1280, 720)
         };
 
         List<string> options = new List<string>();
-        int currentResolutionIndex = 0;
 
         foreach (var target in targetResolutions)
         {
-            Resolution res = new Resolution();
-            res.width  = target.width;
-            res.height = target.height;
+            Resolution res = new Resolution
+            {
+                width = target.width,
+                height = target.height
+            };
 
             availableResolutions.Add(res);
-            options.Add(res.width + " x " + res.height);
-
-            if (res.width == Screen.currentResolution.width &&
-                res.height == Screen.currentResolution.height)
-            {
-                currentResolutionIndex = availableResolutions.Count - 1;
-            }
+            options.Add($"{res.width} x {res.height}");
         }
 
         resolutionDropdown.AddOptions(options);
-        resolutionDropdown.value = currentResolutionIndex;
         resolutionDropdown.RefreshShownValue();
     }
 
-    private void SaveSoundSettings()
+    private void LoadDisplayUISettings()
     {
-        if (masterVolumeSlider != null)
-            PlayerPrefs.SetFloat("MasterVolume", masterVolumeSlider.value);
-        PlayerPrefs.Save();
-    }
+        // ONLY updates UI values
+        // Does NOT force screen changes on scene load
 
-    private void LoadSoundSettings()
-    {
-        float savedVolume = PlayerPrefs.GetFloat("MasterVolume", 0.5f);
-        if (masterVolumeSlider != null)
-            masterVolumeSlider.value = savedVolume;
-        AudioListener.volume = savedVolume;
-    }
+        int savedIndex = PlayerPrefs.GetInt("ResolutionIndex", 2); // default = 1920x1080
+        int savedFullscreen = PlayerPrefs.GetInt("Fullscreen", 1); // default = fullscreen
 
-    private void SaveResolutionSettings()
-    {
         if (resolutionDropdown != null)
-            PlayerPrefs.SetInt("ResolutionIndex", resolutionDropdown.value);
-        if (fullscreenToggle != null)
-            PlayerPrefs.SetInt("Fullscreen", fullscreenToggle.isOn ? 1 : 0);
-        PlayerPrefs.Save();
-    }
-    private void LoadResolutionSettings()
-    {
-        if (!PlayerPrefs.HasKey("ResolutionIndex"))
         {
-            Screen.SetResolution(1920, 1080, true);
+            resolutionDropdown.value =
+                Mathf.Clamp(savedIndex, 0, availableResolutions.Count - 1);
 
-            int index = availableResolutions.FindIndex(
-                r => r.width == 1920 && r.height == 1080);
-            if (index < 0) index = 1;
-
-            if (resolutionDropdown != null)
-                resolutionDropdown.value = index;
-            if (fullscreenToggle != null)
-                fullscreenToggle.isOn = true;
-
-            SaveResolutionSettings();
-            return;
+            resolutionDropdown.RefreshShownValue();
         }
-        int savedIndex    = PlayerPrefs.GetInt("ResolutionIndex", 1);
-        int savedFullscreen = PlayerPrefs.GetInt("Fullscreen", 1);
 
-        if (resolutionDropdown != null)
-            resolutionDropdown.value = Mathf.Clamp(savedIndex,
-                0, availableResolutions.Count - 1);
         if (fullscreenToggle != null)
+        {
             fullscreenToggle.isOn = savedFullscreen == 1;
-
-        OnFullscreenChanged();
+        }
     }
 
-    private void OnDestroy()
+    public void OnResolutionChanged()
     {
-        SaveSoundSettings();
-        SaveResolutionSettings();
+        if (resolutionDropdown == null) return;
+        if (resolutionDropdown.value >= availableResolutions.Count) return;
+
+        Resolution selectedResolution =
+            availableResolutions[resolutionDropdown.value];
+
+        bool isFullscreen = fullscreenToggle != null
+            ? fullscreenToggle.isOn
+            : Screen.fullScreen;
+
+        Screen.SetResolution(
+            selectedResolution.width,
+            selectedResolution.height,
+            isFullscreen
+        );
+
+        PlayerPrefs.SetInt("ResolutionIndex", resolutionDropdown.value);
+        PlayerPrefs.Save();
     }
 
+    public void OnFullscreenChanged()
+    {
+        if (fullscreenToggle == null) return;
+
+        Screen.fullScreenMode = fullscreenToggle.isOn
+            ? FullScreenMode.FullScreenWindow
+            : FullScreenMode.Windowed;
+
+        PlayerPrefs.SetInt(
+            "Fullscreen",
+            fullscreenToggle.isOn ? 1 : 0
+        );
+
+        PlayerPrefs.Save();
+    }
 }

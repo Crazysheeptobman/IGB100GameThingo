@@ -287,7 +287,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DeathScreenController
   deathScreenPanel: {fileID: 1261086119}
   respawnCountdownText: {fileID: 1760421036}
-  deathMessageText: {fileID: 0}
+  deathMessageText: {fileID: 2057318043}
   displayDuration: 2.5
   pauseGameOnDeath: 1
   canvasGroup: {fileID: 1261086122}
@@ -2251,7 +2251,7 @@ RectTransform:
   m_Father: {fileID: 1247465701}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 20, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -3582,7 +3582,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &877450317
 RectTransform:
   m_ObjectHideFlags: 0
@@ -3657,7 +3657,6 @@ GameObject:
   - component: {fileID: 916302464}
   - component: {fileID: 916302470}
   - component: {fileID: 916302469}
-  - component: {fileID: 916302471}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -3875,36 +3874,6 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
---- !u!114 &916302471
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 916302463}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 38d1ed6d68cc3a046af2cc557517426d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::HighScoreSystem
-  player: {fileID: 916302468}
-  scoreText: {fileID: 0}
-  bestScoreText: {fileID: 0}
-  coinsText: {fileID: 0}
-  timeText: {fileID: 0}
-  combinedStatsText: {fileID: 0}
-  scoreFormat: 'Score: {0}'
-  bestScoreFormat: 'Best Score: {0}'
-  coinsFormat: 'Coins: {0}'
-  timeFormat: 'Time: {0}'
-  combinedStatsFormat: 'Score: {0}
-
-    Best Score: {1}
-
-    Coins: {2}
-
-    Time:
-    {3}'
 --- !u!1001 &943265269
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4004,7 +3973,7 @@ RectTransform:
   m_Father: {fileID: 2119352141}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 10, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -4499,9 +4468,9 @@ RectTransform:
   - {fileID: 738404221}
   m_Father: {fileID: 829341350}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 50, y: -237.4}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1109682266
@@ -4651,9 +4620,9 @@ RectTransform:
   - {fileID: 1447500396}
   m_Father: {fileID: 829341350}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 50, y: -424.8}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1149750370
@@ -5643,7 +5612,7 @@ RectTransform:
   m_Father: {fileID: 1992576481}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 10, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -6068,9 +6037,9 @@ RectTransform:
   - {fileID: 1910386857}
   m_Father: {fileID: 829341350}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 50, y: -50}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1582661824
@@ -6989,9 +6958,9 @@ RectTransform:
   - {fileID: 856999017}
   m_Father: {fileID: 829341350}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 50, y: -612.2}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1878492378
@@ -7512,7 +7481,7 @@ RectTransform:
   m_Father: {fileID: 1274009558}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 20, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -7847,7 +7816,7 @@ MonoBehaviour:
   m_fontColor32:
     serializedVersion: 2
     rgba: 4278190335
-  m_fontColor: {r: 1, g: 0, b: 0, a: 1}
+  m_fontColor: {r: 0.9793825, g: 1, b: 0, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
@@ -8157,8 +8126,8 @@ MonoBehaviour:
   collectableSpawnPadding: 0
   spawnCoins: 1
   coinPrefab: {fileID: 1621012984}
-  minCoinsPerSegment: 0
-  maxCoinsPerSegment: 3
+  minCoinsPerSegment: 4
+  maxCoinsPerSegment: 7
   usePooling: 1
   poolPrewarmPerPrefab: 1
   maxSpawnsPerFrame: 8
@@ -11085,9 +11054,9 @@ SceneRoots:
   - {fileID: 700001001}
   - {fileID: 943265269}
   - {fileID: 2059796049}
+  - {fileID: 2128435526}
   - {fileID: 1655105568}
   - {fileID: 52375837}
   - {fileID: 1847516642}
   - {fileID: 2011856307}
   - {fileID: 248624330}
-  - {fileID: 2128435526}

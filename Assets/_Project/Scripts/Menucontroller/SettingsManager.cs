@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Audio;
 using UnityEngine.UI;
 using System;
 using System.Collections.Generic;
@@ -9,8 +10,12 @@ public class SettingsManager : MonoBehaviour
     [Header("Panel")]
     [SerializeField] private GameObject settingsPanelRoot;
 
+    [Header("Audio Mixer")]
+    [SerializeField] private AudioMixer audioMixer;
+
     [Header("Sound Settings")]
-    [SerializeField] private Slider masterVolumeSlider;
+    [SerializeField] private Slider musicVolumeSlider;
+    [SerializeField] private Slider sfxVolumeSlider;
 
     [Header("Mouse Settings")]
     [SerializeField] private Slider mouseSensitivitySlider;
@@ -40,8 +45,19 @@ public class SettingsManager : MonoBehaviour
         LoadMouseSettings();
         LoadDisplayUISettings();
 
-        if (masterVolumeSlider != null)
-            masterVolumeSlider.onValueChanged.AddListener(delegate { OnMasterVolumeChanged(); });
+        if (musicVolumeSlider != null)
+        {
+            musicVolumeSlider.minValue = 0f;
+            musicVolumeSlider.maxValue = 1f;
+            musicVolumeSlider.onValueChanged.AddListener(delegate { OnMusicVolumeChanged(); });
+        }
+
+        if (sfxVolumeSlider != null)
+        {
+            sfxVolumeSlider.minValue = 0f;
+            sfxVolumeSlider.maxValue = 1f;
+            sfxVolumeSlider.onValueChanged.AddListener(delegate { OnSFXVolumeChanged(); });
+        }
 
         if (mouseSensitivitySlider != null)
         {
@@ -86,23 +102,45 @@ public class SettingsManager : MonoBehaviour
             SettingsClosed?.Invoke();
     }
 
-    public void OnMasterVolumeChanged()
+    private float SliderToDecibels(float sliderValue)
     {
-        if (masterVolumeSlider == null) return;
+        sliderValue = Mathf.Clamp(sliderValue, 0.0001f, 1f);
+        return Mathf.Log10(sliderValue) * 20f;
+    }
 
-        AudioListener.volume = masterVolumeSlider.value;
-        PlayerPrefs.SetFloat("MasterVolume", masterVolumeSlider.value);
+    public void OnMusicVolumeChanged()
+    {
+        if (musicVolumeSlider == null || audioMixer == null) return;
+
+        audioMixer.SetFloat("MusicVolume", SliderToDecibels(musicVolumeSlider.value));
+        PlayerPrefs.SetFloat("MusicVolume", musicVolumeSlider.value);
+        PlayerPrefs.Save();
+    }
+
+    public void OnSFXVolumeChanged()
+    {
+        if (sfxVolumeSlider == null || audioMixer == null) return;
+
+        audioMixer.SetFloat("SFXVolume", SliderToDecibels(sfxVolumeSlider.value));
+        PlayerPrefs.SetFloat("SFXVolume", sfxVolumeSlider.value);
         PlayerPrefs.Save();
     }
 
     private void LoadSoundSettings()
     {
-        float savedVolume = PlayerPrefs.GetFloat("MasterVolume", 0.5f);
+        if (audioMixer == null) return;
 
-        if (masterVolumeSlider != null)
-            masterVolumeSlider.value = savedVolume;
+        float savedMusic = PlayerPrefs.GetFloat("MusicVolume", 0.75f);
+        float savedSFX = PlayerPrefs.GetFloat("SFXVolume", 1f);
 
-        AudioListener.volume = savedVolume;
+        if (musicVolumeSlider != null)
+            musicVolumeSlider.value = savedMusic;
+
+        if (sfxVolumeSlider != null)
+            sfxVolumeSlider.value = savedSFX;
+
+        audioMixer.SetFloat("MusicVolume", SliderToDecibels(savedMusic));
+        audioMixer.SetFloat("SFXVolume", SliderToDecibels(savedSFX));
     }
 
     public void OnMouseSensitivityChanged()
@@ -110,7 +148,6 @@ public class SettingsManager : MonoBehaviour
         if (mouseSensitivitySlider == null) return;
 
         MouseSensitivity = mouseSensitivitySlider.value;
-
         PlayerPrefs.SetFloat("MouseSensitivity", MouseSensitivity);
         PlayerPrefs.Save();
     }
@@ -160,15 +197,12 @@ public class SettingsManager : MonoBehaviour
 
     private void LoadDisplayUISettings()
     {
-
-        int savedIndex = PlayerPrefs.GetInt("ResolutionIndex", 2); 
-        int savedFullscreen = PlayerPrefs.GetInt("Fullscreen", 1); 
+        int savedIndex = PlayerPrefs.GetInt("ResolutionIndex", 2);
+        int savedFullscreen = PlayerPrefs.GetInt("Fullscreen", 1);
 
         if (resolutionDropdown != null)
         {
-            resolutionDropdown.value =
-                Mathf.Clamp(savedIndex, 0, availableResolutions.Count - 1);
-
+            resolutionDropdown.value = Mathf.Clamp(savedIndex, 0, availableResolutions.Count - 1);
             resolutionDropdown.RefreshShownValue();
         }
 
@@ -183,18 +217,11 @@ public class SettingsManager : MonoBehaviour
         if (resolutionDropdown == null) return;
         if (resolutionDropdown.value >= availableResolutions.Count) return;
 
-        Resolution selectedResolution =
-            availableResolutions[resolutionDropdown.value];
+        Resolution selectedResolution = availableResolutions[resolutionDropdown.value];
 
-        bool isFullscreen = fullscreenToggle != null
-            ? fullscreenToggle.isOn
-            : Screen.fullScreen;
+        bool isFullscreen = fullscreenToggle != null ? fullscreenToggle.isOn : Screen.fullScreen;
 
-        Screen.SetResolution(
-            selectedResolution.width,
-            selectedResolution.height,
-            isFullscreen
-        );
+        Screen.SetResolution(selectedResolution.width, selectedResolution.height, isFullscreen);
 
         PlayerPrefs.SetInt("ResolutionIndex", resolutionDropdown.value);
         PlayerPrefs.Save();
@@ -208,11 +235,7 @@ public class SettingsManager : MonoBehaviour
             ? FullScreenMode.FullScreenWindow
             : FullScreenMode.Windowed;
 
-        PlayerPrefs.SetInt(
-            "Fullscreen",
-            fullscreenToggle.isOn ? 1 : 0
-        );
-
+        PlayerPrefs.SetInt("Fullscreen", fullscreenToggle.isOn ? 1 : 0);
         PlayerPrefs.Save();
     }
 }

@@ -144,14 +144,13 @@ public class ParkourPlayerMovement : MonoBehaviour
 
         ReadInput();
 
-        // Check for manual restart (R key) - bypasses death screen
         if (WasRestartPressedThisFrame())
         {
             RestartScene();
             return;
         }
 
-        // Only trigger death if the player is below the boundary AND not saved by an active grapple
+        
         if (transform.position.y < deathYLevel && !IsGrappling)
         {
             TriggerDeath();
@@ -376,10 +375,9 @@ public class ParkourPlayerMovement : MonoBehaviour
             return;
         }
 
-        // Gentle drag - bleeds momentum naturally, scales with speed
+
         body.AddForce(-currentHorizontalVelocity * airDrag, ForceMode.VelocityChange);
 
-        // Only steer toward walkSpeed if we're below it - never brake momentum above it
         float currentSpeed = currentHorizontalVelocity.magnitude;
         float targetSpeed = Mathf.Max(currentSpeed, walkSpeed);
         Vector3 airTargetVelocity = moveDirection * targetSpeed;

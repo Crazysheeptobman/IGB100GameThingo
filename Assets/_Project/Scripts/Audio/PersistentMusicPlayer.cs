@@ -1,5 +1,6 @@
 using UnityEngine;
-using UnityEngine.SceneManagement; // NEW
+using UnityEngine.Audio;
+using UnityEngine.SceneManagement;
 
 [DisallowMultipleComponent]
 public class PersistentMusicPlayer : MonoBehaviour
@@ -12,8 +13,11 @@ public class PersistentMusicPlayer : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float volume = 0.45f;
     [SerializeField] private bool playOnAwake = true;
     [SerializeField] private bool switchToDifferentSceneClip = true;
-    [SerializeField] private string mainMenuSceneName = "MainMenu"; 
-    [SerializeField] private bool destroyOnMainMenu = true; 
+    [SerializeField] private string mainMenuSceneName = "MainMenu";
+    [SerializeField] private bool destroyOnMainMenu = true;
+
+    [Header("Audio Mixer")]
+    [SerializeField] private AudioMixerGroup musicMixerGroup;
 
     private AudioSource musicSource;
 
@@ -37,17 +41,14 @@ public class PersistentMusicPlayer : MonoBehaviour
             PlayMusic();
         }
 
-        // NEW: Subscribe to scene changes
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
-    // NEW: Clean up event subscription
     private void OnDestroy()
     {
         SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
-    // NEW: Handle scene changes
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         if (scene.name == mainMenuSceneName)
@@ -55,17 +56,14 @@ public class PersistentMusicPlayer : MonoBehaviour
             if (destroyOnMainMenu)
             {
                 if (musicSource != null)
-                {
                     musicSource.Stop();
-                }
+
                 Destroy(gameObject);
             }
             else
             {
                 if (musicSource != null && musicSource.isPlaying)
-                {
                     musicSource.Stop();
-                }
             }
         }
     }
@@ -83,9 +81,7 @@ public class PersistentMusicPlayer : MonoBehaviour
         ResolveFallbackClip();
 
         if (musicClip == null)
-        {
             return;
-        }
 
         EnsureAudioSource();
 
@@ -105,9 +101,7 @@ public class PersistentMusicPlayer : MonoBehaviour
     private void ApplyDuplicateSettings(PersistentMusicPlayer duplicate)
     {
         if (duplicate == null)
-        {
             return;
-        }
 
         volume = duplicate.volume;
         EnsureAudioSource();
@@ -136,9 +130,7 @@ public class PersistentMusicPlayer : MonoBehaviour
         {
             musicSource = GetComponent<AudioSource>();
             if (musicSource == null)
-            {
                 musicSource = gameObject.AddComponent<AudioSource>();
-            }
         }
 
         musicSource.playOnAwake = false;
@@ -146,14 +138,15 @@ public class PersistentMusicPlayer : MonoBehaviour
         musicSource.spatialBlend = 0f;
         musicSource.dopplerLevel = 0f;
         musicSource.volume = volume;
+
+        if (musicMixerGroup != null)
+            musicSource.outputAudioMixerGroup = musicMixerGroup;
     }
 
     private void ResolveFallbackClip()
     {
         if (musicClip != null || string.IsNullOrEmpty(resourcesFallbackPath))
-        {
             return;
-        }
 
         musicClip = Resources.Load<AudioClip>(resourcesFallbackPath);
     }

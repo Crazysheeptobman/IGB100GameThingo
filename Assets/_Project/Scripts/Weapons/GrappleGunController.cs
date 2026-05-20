@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Audio;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
@@ -64,11 +65,15 @@ public class GrappleGunController : MonoBehaviour
     [SerializeField] private Vector3 hookForwardAxisLocal = Vector3.forward;
 
     [Header("Audio")]
+    [SerializeField] private AudioMixerGroup sfxMixerGroup;
     [SerializeField] private AudioClip grappleDeployClip;
+    [SerializeField] private AudioClip grappleAttachClip;
     [SerializeField] private AudioClip grappleReturnClip;
     [SerializeField] private AudioSource grappleDeploySource;
+    [SerializeField] private AudioSource grappleAttachSource;
     [SerializeField] private AudioSource grappleReturnSource;
     [SerializeField, Range(0f, 1f)] private float grappleDeployVolume = 0.85f;
+    [SerializeField, Range(0f, 1f)] private float grappleAttachVolume = 0.9f;
     [SerializeField, Range(0f, 1f)] private float grappleReturnVolume = 0.75f;
     [SerializeField, Min(0.01f)] private float minimumReturnSoundDuration = 0.05f;
 
@@ -831,6 +836,7 @@ public class GrappleGunController : MonoBehaviour
 
         SetRopeVisible(true);
         StartGrappleTimer();
+        PlayAttachSfx();
     }
 
     private void EndGrapple(bool playRetract, bool immediateVisualReset)
@@ -1462,6 +1468,7 @@ public class GrappleGunController : MonoBehaviour
     private void EnsureAudioSources()
     {
         EnsureAudioSource(ref grappleDeploySource);
+        EnsureAudioSource(ref grappleAttachSource);
         EnsureAudioSource(ref grappleReturnSource);
     }
 
@@ -1477,25 +1484,31 @@ public class GrappleGunController : MonoBehaviour
         source.spatialBlend = 0f;
         source.dopplerLevel = 0f;
         source.pitch = 1f;
+
+        // Route to SFX mixer group if assigned
+        if (sfxMixerGroup != null)
+            source.outputAudioMixerGroup = sfxMixerGroup;
     }
 
     private void PlayDeploySfx()
     {
-        if (grappleDeployClip == null)
-        {
-            return;
-        }
+        if (grappleDeployClip == null) return;
 
         EnsureAudioSources();
         grappleDeploySource.PlayOneShot(grappleDeployClip, grappleDeployVolume);
     }
 
+    private void PlayAttachSfx()
+    {
+        if (grappleAttachClip == null) return;
+
+        EnsureAudioSources();
+        grappleAttachSource.PlayOneShot(grappleAttachClip, grappleAttachVolume);
+    }
+
     private void PlayReturnSfx(float targetDuration)
     {
-        if (grappleReturnClip == null)
-        {
-            return;
-        }
+        if (grappleReturnClip == null) return;
 
         EnsureAudioSources();
         grappleReturnSource.Stop();

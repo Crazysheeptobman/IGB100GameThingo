@@ -18,6 +18,7 @@ public class ParkourPlayerMovement : MonoBehaviour
     [SerializeField, Min(0f)] private float groundDeceleration = 60f;
     [SerializeField, Min(0f)] private float airAcceleration = 28f;
     [SerializeField, Min(0f)] private float maxAirSpeed = 11f;
+    [SerializeField, Min(0f)] private float airDrag = 0.035f;
     [SerializeField] private bool normalizeMoveInput = true;
 
     [Header("Grapple Momentum")]
@@ -150,7 +151,8 @@ public class ParkourPlayerMovement : MonoBehaviour
             return;
         }
 
-        if (transform.position.y < deathYLevel)
+        // Only trigger death if the player is below the boundary AND not saved by an active grapple
+        if (transform.position.y < deathYLevel && !IsGrappling)
         {
             TriggerDeath();
             return;
@@ -374,7 +376,13 @@ public class ParkourPlayerMovement : MonoBehaviour
             return;
         }
 
-        Vector3 airTargetVelocity = moveDirection * walkSpeed;
+        // Gentle drag - bleeds momentum naturally, scales with speed
+        body.AddForce(-currentHorizontalVelocity * airDrag, ForceMode.VelocityChange);
+
+        // Only steer toward walkSpeed if we're below it - never brake momentum above it
+        float currentSpeed = currentHorizontalVelocity.magnitude;
+        float targetSpeed = Mathf.Max(currentSpeed, walkSpeed);
+        Vector3 airTargetVelocity = moveDirection * targetSpeed;
         Vector3 airVelocityDelta = airTargetVelocity - currentHorizontalVelocity;
         Vector3 airClampedDelta = Vector3.ClampMagnitude(airVelocityDelta, airAcceleration * Time.fixedDeltaTime);
         Vector3 projectedAirVelocity = currentHorizontalVelocity + airClampedDelta;

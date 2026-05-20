@@ -3812,6 +3812,7 @@ MonoBehaviour:
   groundDeceleration: 60
   airAcceleration: 50
   maxAirSpeed: 100
+  airDrag: 0.015
   normalizeMoveInput: 1
   grappleController: {fileID: 0}
   grappleAirControlAcceleration: 16
@@ -3822,7 +3823,7 @@ MonoBehaviour:
   coyoteTime: 0.12
   jumpBufferTime: 0.15
   gravity: 40
-  lowJumpGravityMultiplier: 1.5
+  lowJumpGravityMultiplier: 2.2
   fallGravityMultiplier: 2.1
   maxFallSpeed: 50
   groundMask:
@@ -8290,15 +8291,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8039782922665596203, guid: bddde96586ad17d4490632b9a89409b2, type: 3}
       propertyPath: m_Size.x
-      value: 6
+      value: 8
       objectReference: {fileID: 0}
     - target: {fileID: 8039782922665596203, guid: bddde96586ad17d4490632b9a89409b2, type: 3}
       propertyPath: m_Size.y
-      value: 6
+      value: 8
       objectReference: {fileID: 0}
     - target: {fileID: 8039782922665596203, guid: bddde96586ad17d4490632b9a89409b2, type: 3}
       propertyPath: m_Size.z
-      value: 6
+      value: 8
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
